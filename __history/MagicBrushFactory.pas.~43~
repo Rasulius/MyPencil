@@ -1,0 +1,66 @@
+unit MagicBrushFactory;
+
+interface
+
+uses MagicBrush, Graphics;
+
+{
+‘абрика создани€ кистей представл€ет собой абстрактную фабрику
+
+}
+
+type
+  TMagicBrushFactory = class;
+
+var
+  aFactory: TMagicBrushFactory;
+
+function CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType; anActiveColor: TColor; BrushWidth: Integer):TMagicBrush;
+
+implementation
+
+uses MagicBrushFirstComplect, SysUtils;
+
+
+type
+  TBrushType =(tsSimple, tsGradientBrush);
+
+  TMagicBrushFactory = class
+  public
+    function CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType; anActiveColor: TColor; BrushWidth: Integer): TMagicBrush;
+  end;
+
+
+{ TMagicBrushFactory }
+
+function TMagicBrushFactory.CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType;
+  anActiveColor: TColor; BrushWidth: Integer): TMagicBrush;
+begin
+  Result := nil;
+  // —оздаем кисти через фабрику
+  case aBrushType of
+    tsSimple: begin
+      Exception.Create('Unknown brush');
+    end;
+    tsGradientBrush: begin
+       Result := TGradientBrush.Create(aCanvas) ;
+       Result.Width := BrushWidth;
+       Result.ActiveColor := anActiveColor;
+    end;
+  end;
+end;
+
+function CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType; anActiveColor: TColor; BrushWidth: Integer):TMagicBrush;
+begin
+
+
+end;
+
+// -------------------------ѕри загрузке инициализируем переменную
+
+initialization;
+  aFactory := TMagicBrushFactory.Create;
+finalization
+  aFactory.Free;
+  aFactory := nil;
+end.

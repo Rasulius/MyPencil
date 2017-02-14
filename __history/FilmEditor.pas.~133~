@@ -1,0 +1,213 @@
+unit FilmEditor;
+
+interface
+
+uses Windows, Graphics, SysUtils;
+
+{* Абстрактный класс редактор
+  позваляем добавлять кадр, удалить, копировать
+
+
+ *}
+type
+  TFilmEditorType = (feBitmapFileEditor);
+  TFilmEditor = class
+  public
+    constructor Create; virtual; abstract;
+    destructor Destroy; override;
+
+      // Добавить кадр
+     procedure AddFrame(aFrame: TBitmap); virtual; abstract;
+     // Удалить кадр
+     procedure DeleteFrame(anIndex: Integer); virtual; abstract;
+     //  Копировать кадр
+     procedure CopyFrame(anSourceIndex: Integer; aCopyIndex: Integer); virtual; abstract;
+     // Получить кадр
+     procedure GetFrame(anIndex: Integer; aBitmap: TBitmap); virtual; abstract;
+     // Модифицировать кадр
+     procedure ModifyFrame(anIndex: Integer; aBitmap: TBitmap); virtual; abstract;
+     // Если существует кадр
+     function FrameExist(anIndex: Integer): Boolean; virtual; abstract;
+      // количество кадров
+     function FrameCount: Integer; virtual; abstract;
+
+  end;
+
+  // реализация класса FilmEditor
+
+  TFileFilmEditor = class(TFilmEditor)
+  private
+    FBaseFileName: String;
+    FTempFolderName: String;
+    FAbsolutePath: String;
+    FIndex: Integer;
+    Fcount: Integer;
+
+    function CreateFilename(aBase: String; Number: Integer; NumberOfPlaces: Integer = 10): String;
+    procedure CheckIndex(anIndex: Integer);
+    //.unction GetNameByIndex(Index: Integer): String;
+
+  public
+    constructor Create(); override;
+    destructor Destroy; override;
+
+    procedure AddFrame(aFrame: TBitmap);override;
+    // Удалить кадр
+    procedure DeleteFrame(anIndex: Integer); override;
+ //  Копировать кадр
+    procedure CopyFrame(anSourceIndex: Integer; aCopyIndex: Integer); override;
+ // Модфицировать кадр
+    procedure ModifyFrame(anIndex: Integer; aBitmap: TBitmap); override;
+
+    procedure GetFrame(anIndex: Integer; aBitmap: TBitmap);override;
+
+    function FrameExist(anIndex: Integer): Boolean;  override;
+      // количество кадров
+    function FrameCount: Integer;  override;
+  end;
+
+
+  TEditorFabrics=class
+    function CreateFilmEditor(aEditorType: TFilmEditorType): TFileFilmEditor;
+  end;
+
+implementation
+
+
+{ TFileFilmEditor }
+
+constructor TFileFilmEditor.Create;
+begin
+  FBaseFileName :='temp_';
+  FTempFolderName := 'temp_project';
+  FAbsolutePath := IncludeTrailingBackslash(GetCurrentDir)+FTempFolderName;
+  FIndex := -1;
+  Fcount := 0;
+  // Создаем каталог для размещения временных файлов
+  if not DirectoryExists(FAbsolutePath) then begin
+    CreateDir(FAbsolutePath);
+  end;
+end;
+
+function TFileFilmEditor.CreateFilename(aBase: String; Number,
+  NumberOfPlaces: Integer): String;
+var
+  aFormatString: String;
+begin
+  aFormatString := '%s%.'+IntToStr(NumberOfPlaces)+'d.bmp';
+  Result := Format(aFormatString,[aBase,Number]);
+end;
+
+function TFileFilmEditor.FrameCount: Integer;
+begin
+  Result := Fcount;
+end;
+
+function TFileFilmEditor.FrameExist(anIndex: Integer): Boolean;
+var
+  aFileName: String;
+begin
+  CheckIndex(anIndex);
+  aFileName:= CreateFilename(FBaseFileName, anIndex);
+  Result := FileExists(aFileName);
+end;
+
+procedure TFileFilmEditor.GetFrame(anIndex: Integer; aBitmap: TBitmap);
+begin
+  CheckIndex(anIndex);
+  aBitmap.LoadFromFile(CreateFilename(FBaseFileName, anIndex));
+end;
+{
+function TFileFilmEditor.GetNameByIndex(Index: Integer): String;
+begin
+ // Result := IncludeTrailingBackslash(FAbsolutePath)+FBaseFileName+IntToStr(Index)+'.bmp';
+end;
+ }
+
+procedure TFileFilmEditor.AddFrame(aFrame: TBitmap);
+begin
+  Inc(Findex);
+  Inc(FCount);
+  aFrame.SaveToFile(CreateFilename(FBaseFileName, FIndex));
+end;
+
+// Загружаем файл по индексу
+
+procedure TFileFilmEditor.CheckIndex(anIndex: Integer);
+begin
+  if anIndex > Fcount then begin
+    raise Exception.Create('Запрошен индекс превышайющий количество #10#13 зарегистрированных индексов в проекте');
+  end;
+
+end;
+
+procedure TFileFilmEditor.CopyFrame(anSourceIndex: Integer; aCopyIndex: Integer);
+var
+  aBitmap: TBitmap;
+begin
+  CheckIndex(anSourceIndex);
+  aBitmap := TBitmap.Create;
+  // Если копируем на новое место значит создаем новый кадр,
+  // соответственно количество кадров увеличиваем
+  if aCopyIndex>Fcount then begin
+    Fcount := aCopyIndex
+  end;
+
+  try
+    aBitmap.LoadFromFile(CreateFilename(FBaseFileName, anSourceIndex));
+    aBitmap.SaveToFile(CreateFilename(FBaseFileName, aCopyIndex));
+  finally
+    aBitmap.Free;
+  end;
+
+end;
+
+// Модифицируем индексы
+
+procedure TFileFilmEditor.ModifyFrame(anIndex: Integer; aBitmap: TBitmap);
+begin
+  CheckIndex(anIndex);
+  aBitmap.SaveToFile(GetNameByIndex(anIndex));
+end;
+
+
+procedure TFileFilmEditor.DeleteFrame(anIndex: Integer);
+var
+  aFileName: String;
+begin
+  CheckIndex(anIndex);
+  aFileName := GetNameByIndex(anIndex);
+
+  if FileExists(aFileName) then begin
+    SysUtils.DeleteFile(aFileName);
+  end;
+
+end;
+
+destructor TFileFilmEditor.Destroy;
+begin
+  inherited;
+end;
+
+{ TEditorFabrics }
+
+function TEditorFabrics.CreateFilmEditor(
+  aEditorType: TFilmEditorType): TFileFilmEditor;
+begin
+//
+  Result := nil;
+
+  if aEditorType = feBitmapFileEditor then begin
+    Result := TFileFilmEditor.Create;
+  end;
+
+end;
+
+{ TFilmEditor }
+
+destructor TFilmEditor.Destroy;
+begin
+  inherited;
+end;
+
+end.

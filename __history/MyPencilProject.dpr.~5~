@@ -1,0 +1,18 @@
+program MyPencilProject;
+
+uses
+  Forms,
+  MyPencil in 'MyPencil.pas' {Form1},
+  OpenGLEngine in 'OpenGLEngine.pas',
+  ColorEditor in 'ColorEditor.pas',
+  FilmEditor in 'FilmEditor.pas',
+  FilmManager in 'FilmManager.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TForm1, Form1);
+  Application.Run;
+end.

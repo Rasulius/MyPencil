@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2016.12.13 23:19:37.423.pas,C:\Users\Rasul\Documents\RAD Studio\Projects\Unit1.pas=D:\Реферат\В работе\MyPencil\MyPencil.pas</Transaction>
+    <Transaction>2016.12.13 23:19:37.423.dfm,C:\Users\Rasul\Documents\RAD Studio\Projects\Unit1.dfm=D:\Реферат\В работе\MyPencil\MyPencil.dfm</Transaction>
+    <Transaction>2016.12.13 23:19:44.721.dproj,C:\Users\Rasul\Documents\RAD Studio\Projects\Project1.dproj=D:\Реферат\В работе\MyPencil\MyPencilProject.dproj</Transaction>
+    <Transaction>2016.12.17 01:32:10.899.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\OpenGLEngine.pas</Transaction>
+    <Transaction>2016.12.17 01:32:15.548.dproj,D:\Реферат\В работе\MyPencil\MyPencilProject.dproj=D:\Реферат\В работе\MyPencil\MyPencilProject.dproj</Transaction>
+    <Transaction>2016.12.18 22:10:27.730.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\ColorEditor.pas</Transaction>
+    <Transaction>2016.12.20 20:57:55.303.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\FilmEditor.pas</Transaction>
+    <Transaction>2016.12.21 00:18:03.507.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\FilmManager.pas</Transaction>
+    <Transaction>2016.12.21 20:34:39.043.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\StandartResolutions.pas</Transaction>
+    <Transaction>2016.12.22 12:04:21.048.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\ImageUtils.pas</Transaction>
+    <Transaction>2017.01.03 01:00:27.764.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\DrawStateMachine.pas</Transaction>
+    <Transaction>2017.01.03 01:00:32.128.dproj,D:\Реферат\В работе\MyPencil\MyPencilProject.dproj=D:\Реферат\В работе\MyPencil\MyPencilProject.dproj</Transaction>
+    <Transaction>2017.01.03 01:10:14.647.pas,D:\Реферат\В работе\MyPencil\DrawStateMachine.pas=</Transaction>
+    <Transaction>2017.01.04 22:03:44.438.pas,D:\Реферат\В работе\MyPencil\OpenGLEngine.pas=</Transaction>
+    <Transaction>2017.01.05 21:43:29.867.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\MagicBrush.pas</Transaction>
+    <Transaction>2017.01.05 22:13:47.477.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\MagicBrushFactory.pas</Transaction>
+    <Transaction>2017.01.05 22:13:52.517.dproj,D:\Реферат\В работе\MyPencil\MyPencilProject.dproj=D:\Реферат\В работе\MyPencil\MyPencilProject.dproj</Transaction>
+    <Transaction>2017.01.05 22:18:51.471.pas,D:\Реферат\В работе\MyPencil\Unit1.pas=D:\Реферат\В работе\MyPencil\MagicBrushFirstComplect.pas</Transaction>
+  </Transactions>
+</BorlandProject>

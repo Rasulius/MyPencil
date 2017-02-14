@@ -1,0 +1,776 @@
+unit MyPencil;
+
+interface
+
+uses
+  Windows,  Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, Menus, ToolWin, ComCtrls, XPMan, StdCtrls, Buttons, ExtCtrls, ImgList,
+  TeCanvas, ActnMan, ActnColorMaps, ActnCtrls, FilmManager, MagicBrush, Spin;
+
+type
+  TCurrentInstrument = (ttPencil, ttFill, ttCircle, ttKvadrat, ttArc, ttline, ttlastic, ttSelect, ttSelectMoveOrRotate, ttMove, ttMagicBrush);
+  TInstumentColorType = (icDrawByMainColor, icDrawByAdditionalColor);
+
+  TForm1 = class(TForm)
+    MainMenu1: TMainMenu;
+    N1: TMenuItem;
+    N2: TMenuItem;
+    XPManifest1: TXPManifest;
+    OpenGLPanel: TPanel;
+    InstumentBox: TGroupBox;
+    SpeedButton1: TSpeedButton;
+    SpeedButton2: TSpeedButton;
+    DrawCircle: TSpeedButton;
+    DrawRectangle: TSpeedButton;
+    Image: TImage;
+    DrawLine: TSpeedButton;
+    Panel2: TPanel;
+    SpeedButton6: TSpeedButton;
+    CopyCurrent: TSpeedButton;
+    SpeedButton8: TSpeedButton;
+    FilmLentImage: TImage;
+    StatusBar1: TStatusBar;
+    DrawArc: TSpeedButton;
+    ClearLastic: TSpeedButton;
+    ScrollBar1: TScrollBar;
+    SpeedButton5: TSpeedButton;
+    SpeedButton9: TSpeedButton;
+    ResourceList: TImageList;
+    StartAnimation: TSpeedButton;
+    CreateAviFile: TSpeedButton;
+    Timer1: TTimer;
+    ActiveAdiitionalColorBox: TGroupBox;
+    AdditionalColorBox: TPaintBox;
+    ActiveColorBox: TPaintBox;
+    ActiveColorButton: TBitBtn;
+    BitBtn2: TBitBtn;
+    PalitraBox: TGroupBox;
+    ColorListBox: TColorListBox;
+    PenWithBar: TTrackBar;
+    Label1: TLabel;
+    SpeedButton7: TSpeedButton;
+    SpeedButton11: TSpeedButton;
+    ColorDialog: TColorDialog;
+    SelectRegion: TSpeedButton;
+    LayersBox: TGroupBox;
+    GroundButton: TSpeedButton;
+    PersonLayer: TSpeedButton;
+    Label2: TLabel;
+    OpacityBar: TTrackBar;
+    GradientBrush: TSpeedButton;
+    PerSecSpinEdit: TSpinEdit;
+    PerSecLabel: TLabel;
+    N3: TMenuItem;
+    SaveToFile: TMenuItem;
+    N5: TMenuItem;
+    N6: TMenuItem;
+    N7: TMenuItem;
+    N8: TMenuItem;
+    SaveDialog: TSaveDialog;
+    procedure FormCreate(Sender: TObject);
+    procedure SpeedButton1Click(Sender: TObject);
+    procedure SpeedButton2Click(Sender: TObject);
+    procedure DrawCircleClick(Sender: TObject);
+    procedure DrawRectangleClick(Sender: TObject);
+    procedure ImageMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure ImageMouseMove(Sender: TObject; Shift: TShiftState; X,
+      Y: Integer);
+    procedure FormDestroy(Sender: TObject);
+    procedure ImageMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure ColorListBoxMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure DrawLineClick(Sender: TObject);
+    procedure DrawArcClick(Sender: TObject);
+    procedure ClearLasticClick(Sender: TObject);
+    procedure PenWithBarChange(Sender: TObject);
+    procedure CopyCurrentClick(Sender: TObject);
+    procedure StartAnimationClick(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure ActiveColorBoxPaint(Sender: TObject);
+    procedure AdditionalColorBoxPaint(Sender: TObject);
+    procedure ActiveColorButtonClick(Sender: TObject);
+    procedure BitBtn2Click(Sender: TObject);
+    procedure SpeedButton7Click(Sender: TObject);
+    procedure SelectRegionClick(Sender: TObject);
+    function IsLeftMouseClick(aShift: TShiftState): Boolean;
+    function IsRightMouseClick(aShift: TShiftState): Boolean;
+    procedure RememeberCoordinat(aX, aY: Integer);
+    procedure MoveBrushToCoordinat(aX, aY: Integer; aCanvas: TCanvas);
+    // Риовать линию
+    procedure DrawLineTo(aX, aY: Integer; aCanvas: TCanvas; aColor: Tcolor);
+    procedure DrawLines(aX, aY, aX1, aY1: Integer; aCanvas: TCanvas; aColor: TColor);
+    procedure DrawEllipse(aX, aY: Integer; aCanvas: TCanvas; aColor: TColor);
+    procedure DrawQuadrat(aX, aY: Integer; aCanvas: TCanvas; aColor: TColor);
+    procedure DrawSelectQuadrat(aX, aY: Integer; aCanvas: TCanvas);
+    procedure RestoreImageByBufer();
+    function CheckAndCopyCoordinaByFirstCall(aX, aY: Integer; aCanvas: TCanvas): Boolean;
+    function GetCurrentPenColor(aShift: TShiftState): TColor;
+    function ISINSelectedRectangle(aX, aY: Integer): Boolean;
+    procedure SetResizeCursor;
+    procedure SetDefaultCursor;
+    procedure SelectRectangle(aX, aY: Integer);
+    procedure ChangeCursorByInRegion(aX, aY: Integer);
+    procedure SetImageBufferSize(aX, aY: Integer);
+    procedure ClearImageBuffer(aCanvas: TCanvas);
+    procedure DrawWhiteRectangle(aX,aY, aX1, aY1: Integer; aCanvas: TCanvas);
+    procedure CopyRectangle(aSourceRect: TRect; aSourceImage: TCanvas;aDestRect: TRect; aDestImage: TCanvas);
+    procedure OpacityBarChange(Sender: TObject);
+    procedure GradientBrushClick(Sender: TObject);
+    procedure UpdateMagicBrushColor;
+    procedure CreateAviFileClick(Sender: TObject);
+    procedure SaveToFileClick(Sender: TObject);
+   // function ISFirstCall(): Boolean;
+
+  private
+    FCurrentInstrument: TCurrentInstrument;
+    FoldX: Integer;
+    FoldY: Integer;
+    FOldX1: Integer;
+    FOldY1: Integer;
+    FOldX2: Integer;
+    FOldY2: Integer;
+    ActiveColor: TColor;
+    AdditionalColor: TColor;
+    aCurrentColor: TColor;
+    FCurrentPlay: Integer;
+    FOpaCity: Integer;
+
+
+  public
+    ISFirstCall: Boolean;
+    FBufferImage: TBitmap;
+    FSelectBuffer: TBitmap;
+    AlphaBitmapSecondBufferFrame: TBitmap; //Рисунок.
+    FImageManager: TImageBoxFilmManager;
+    StartSelectArea: Boolean;
+    aMagicBrush: TMagicBrush;
+
+    { Public declarations }
+  end;
+
+  var
+    Form1: TForm1;
+implementation
+
+{$R *.dfm}
+
+uses OpenGLEngine,  ColorEditor, FilmEditor, ImageUtils, MagicBrushFactory, ProjectUtils;
+
+{*
+ Image - само изображение
+ FBufferImage - Буфер
+ Alpha Bitmap - Вторичный буфер
+*}
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Создаем картнку в пяти временную
+  FBufferImage := TBitmap.Create;
+// Буффер выдленной области
+  FSelectBuffer:=TBitmap.Create;
+    // Изображение вторичного фона
+  AlphaBitmapSecondBufferFrame := TBitmap.Create;
+  AlphaBitmapSecondBufferFrame.SetSize(Image.Width, Image.Height);
+  FBufferImage.SetSize(Image.Width, Image.Height);
+  FSelectBuffer.SetSize(Image.Width, Image.Height);
+// Первый вызов функции
+
+  ISFirstCall := true;
+  //Очистим цвета
+  ColorListBox.Items.Clear;
+    // Загрузим цвета
+  LoadColors(ColorListBox);
+  // Цвет по умолчанию. черный
+  ActiveColor := clBlack;
+// Создаем менеджер фильмов
+  FImageManager := TImageBoxFilmManager.Create;
+  // Иницализирем  Ленту видео
+  FImageManager.InitImage(FilmLentImage, ResourceList);
+  FImageManager.Repaint;
+  Image.Canvas.Pen.Width := 5;
+  // Изначальные цвета иницализируем Активный цвет Черный - Белый - дополнительный
+  ActiveColor := clBlack;
+  AdditionalColor := clWhite;
+  StartSelectArea := False;
+  aMagicBrush:= nil;
+end;
+
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  FBufferImage.Free;
+  AlphaBitmapSecondBufferFrame.Free;
+  FSelectBuffer.Free;
+end;
+
+// Получить текущий цвет карандаша
+
+function TForm1.GetCurrentPenColor(aShift: TShiftState): TColor;
+begin
+ if ssLeft in  aShift then begin
+    Result := ActiveColor;
+  end else begin
+    Result := AdditionalColor;
+  end;
+end;
+
+// Поменять курсор перемещения
+
+procedure TForm1.ChangeCursorByInRegion(aX, aY: Integer);
+begin
+  if ISINSelectedRectangle(aX, aY)  then begin
+     SetResizeCursor;
+  end else begin
+     SetDefaultCursor;
+  end;
+end;
+
+// Копировать координату при первом вызове и сохранить координату.
+
+function TForm1.CheckAndCopyCoordinaByFirstCall(aX, aY: Integer; aCanvas: TCanvas): Boolean;
+begin
+  Result := ISFirstCall;
+// Если это первый вызов то проверяем и запоминаем коорлинаты
+  if ISFirstCall then begin
+      Image.Canvas.Pen.Width := PenWithBar.Position;
+    // Певый вызов становится уже не первым
+      ISFirstCall := false;
+      // запоминаем координаты
+      RememeberCoordinat(aX, aY);
+      // Двигаем указатель к координате
+      MoveBrushToCoordinat(aX, aY, aCanvas);
+  end;
+end;
+
+// Очистка буфера
+
+procedure TForm1.ClearImageBuffer(aCanvas: TCanvas);
+begin
+  aCanvas.Brush.Color := clWhite;
+  aCanvas.FillRect(Rect( -1,-1, 1000,1000));
+end;
+
+// Инструмет "стерка"
+
+procedure TForm1.ClearLasticClick(Sender: TObject);
+begin
+  FCurrentInstrument := ttlastic;
+end;
+
+// Смена цвета
+
+procedure TForm1.ColorListBoxMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  if ssLeft in Shift then begin
+    ActiveColor := ColorListBox.Selected;
+    Image.Canvas.Pen.Color := ActiveColor;
+    ActiveColorBox.Repaint;
+    UpdateMagicBrushColor;
+  end;
+end;
+
+procedure TForm1.CopyCurrentClick(Sender: TObject);
+begin
+// Активным становится следующий фрейм
+  FImageManager.GetEditor.CopyFrame(FImageManager.ActiveFrame, FImageManager.ActiveFrame+1);
+  FImageManager.ActiveFrame := FImageManager.ActiveFrame + 1;
+  FImageManager.Repaint;
+end;
+
+procedure TForm1.CopyRectangle(aSourceRect: TRect; aSourceImage: TCanvas;
+  aDestRect: TRect; aDestImage: TCanvas);
+begin
+  //aDestImage.CopyRect(aDestRect,aSourceImage, aSourceRect);
+  bitblt(aDestImage.Handle, aDestRect.Left, aDestRect.Top,aDestRect.Right, aDestRect.Bottom
+           ,aSourceImage.Handle,aSourceRect.Left, aSourceRect.Top, SRCCOPY);
+end;
+
+procedure TForm1.DrawArcClick(Sender: TObject);
+begin
+  FCurrentInstrument := ttArc;
+end;
+
+procedure TForm1.DrawEllipse(aX, aY: Integer; aCanvas: TCanvas; aColor: TColor);
+begin
+  aCanvas.Pen.Mode := pmMask;
+  aCanvas.Pen.Color := ActiveColor;
+
+  aCanvas.CopyRect(Rect(0,0, Image.Width, Image.Height), FBufferImage.Canvas,Rect(0,0, Image.Width, Image.Height));
+  aCanvas.Ellipse(FOldX, FOldY, aX, aY);
+end;
+
+procedure TForm1.DrawLines(aX, aY, aX1, aY1: Integer; aCanvas: TCanvas;
+  aColor: TColor);
+begin
+//
+  Image.Canvas.Pen.Color := aColor;
+  Image.Canvas.CopyRect(Rect(0,0, Image.Width, Image.Height), FBufferImage.Canvas,Rect(0,0, Image.Width, Image.Height));
+  Image.Canvas.Pen.Mode := pmCopy;
+  Image.Canvas.MoveTo(aX, aY);
+  Image.Canvas.LineTo(aX1,aY1);
+end;
+
+procedure TForm1.DrawLineClick(Sender: TObject);
+begin
+  FCurrentInstrument := ttline;
+end;
+
+procedure TForm1.DrawLineTo(aX, aY: Integer; aCanvas: TCanvas; aColor: Tcolor);
+begin
+  aCanvas.Pen.Mode := pmCopy;
+  aCanvas.Pen.Color := aColor;
+  aCanvas.LineTo(aX,aY);
+
+end;
+
+procedure TForm1.DrawWhiteRectangle(aX, aY, aX1, aY1: Integer; aCanvas: TCanvas);
+begin
+  aCanvas.Brush.Color := clWhite;
+  aCanvas.FillRect(Rect(aX, aY, aX1, aY1));
+end;
+
+procedure TForm1.ImageMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+    case FCurrentInstrument of
+       ttFill: begin
+            Image.Canvas.Brush.Color := clRed;
+            Image.Canvas.FloodFill(X,Y, clBlack, fsSurface);
+            FBufferImage.Canvas.CopyRect(Rect(0,0, Image.Width, Image.Height), Image.Canvas,Rect(0,0, Image.Width, Image.Height));
+          end;
+       ttPencil: begin
+         ImageMouseMove(Sender, Shift,X,Y);
+       end
+
+       else begin
+
+       end;
+
+   end;
+
+   if FCurrentInstrument = ttSelect then begin
+       StartSelectArea := True;
+       //Image.Canvas.CopyRect();
+
+   end;
+
+
+end;
+
+procedure TForm1.ImageMouseMove(Sender: TObject; Shift: TShiftState; X,
+  Y: Integer);
+begin
+
+   if (ssLeft in Shift) or (ssRight in Shift) then begin
+       // Если это первый вызов то копируем координаты и передвигаем курсор рисования
+        if CheckAndCopyCoordinaByFirstCall(X,Y, Image.Canvas) then begin
+          aCurrentColor := GetCurrentPenColor(Shift);
+          //
+        end;
+        // Узнаем какой инструмент выбран в текущий момент
+        case FCurrentInstrument of
+          ttPencil: begin
+             DrawLineTo(X, Y, Image.Canvas, aCurrentColor);
+          end;
+          // Рисуем круг
+          ttCircle: begin
+            DrawEllipse(X, Y, Image.Canvas, aCurrentColor);
+          end;
+
+          ttKvadrat: begin
+            DrawQuadrat(X, Y, Image.Canvas, aCurrentColor);
+          end;
+          // Рисуем линию
+          ttline: begin
+          // Рисуем на буфере потом копируем на наше изображение
+             DrawLines(FoldX, FoldY, X, Y, Image.Canvas, aCurrentColor);
+          end;
+
+          ttArc: begin
+             // Рисуем на буфере потом копируем на наще изображение
+          end;
+
+          ttLastic: begin
+          // Цвет стерки это вторичный цвет
+            DrawLineTo(X, Y, Image.Canvas, AdditionalColor);
+          end;
+
+          ttSelect: begin
+            SelectRectangle(X, Y);
+            DrawSelectQuadrat(X, Y,Image.Canvas);
+          end;
+
+          ttMagicBrush: begin
+            //----Магические кисти
+
+              if not (Assigned(aMagicBrush)) then begin
+                 aMagicBrush := CreateBrush(Image.Canvas,tsGradientBrush, ActiveColor, PenWithBar.Position)
+              end;
+              aMagicBrush.Width := PenWithBar.Position;
+              aMagicBrush.Draw(X, Y);
+          end;
+
+
+          ttSelectMoveOrRotate: begin
+           // Если щелкнули внутри области то переходим к состоянию перенос если
+           // Если за пределами то состояние переходит в состояние в обратное.
+           // Очередная развилка которая отправляет программу по одному из двух путей
+             if ISINSelectedRectangle(X, Y) then begin
+             // Устанавливаем размер буфера копирования
+               SetImageBufferSize(X,Y);
+                //Копируем область в буфер выдленной области
+               CopyRectangle(Rect(FoldX, FoldY, FOldX1, FOldY1),FBufferImage.Canvas,
+                             Rect(0,0,abs(FoldX-FOldX1), Abs(FoldY-FOldY1)), FSelectBuffer.Canvas);
+               // На месте копированного прямоугольника в буфер рисуем белый прямоугольник
+               DrawWhiteRectangle(FoldX, FoldY, FOldX1, FOldY1, FBufferImage.Canvas);
+
+               FCurrentInstrument := ttMove;
+             end else begin
+               FCurrentInstrument := ttSelect;
+             end;
+          end;
+
+          ttMove: begin
+             //Рисуем изображение в буфере
+             Image.Canvas.Draw(0,0, FBufferImage);
+             // Рисуем выделенное изображение (Пока рисуем изображение без маски в дальнейшем надо
+             // реализовать рисование по маске)
+             Image.Canvas.Draw(X+(FoldX-FOldX2),Y+(FoldY-FOldY2), FSelectBuffer);
+          end;
+
+        end;
+
+    end else begin
+    // Меняем курсор взависимости от попадания в область
+      if FCurrentInstrument = ttSelectMoveOrRotate then begin
+         ChangeCursorByInRegion(X,Y);
+      end;
+
+    end;
+
+      //Выодим координаты
+    StatusBar1.Panels.Items[0].Text := IntToStr(X)+' ' + IntToStr(Y);
+
+end;
+
+procedure TForm1.ImageMouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  anEditor: TFilmEditor;
+
+begin
+  FSelectBuffer.SaveToFile('SelectBuffer.bmp');
+  FBufferImage.SaveToFile('BufferImage.bmp');
+
+
+// Если у нас в состояние копирования или выделения области то выходим из процедуры
+  if FCurrentInstrument = ttSelect then begin
+    FCurrentInstrument := ttSelectMoveOrRotate;
+    ISFirstCall := false;
+    Exit;
+  end;
+
+  if FCurrentInstrument = ttMove then begin
+    FCurrentInstrument := ttSelect;
+    SetDefaultCursor;
+  end;
+
+  if FCurrentInstrument = ttMagicBrush then begin
+    UpdateMagicBrushColor;
+  end;
+
+
+  if not  ISFirstCall    then begin
+   // Если активный кадр у нас не первый то
+     if FImageManager.ActiveFrame >0 then begin
+     // Копируем предыдущий кадр
+       //FImageManager.GetEditor.GetFrame(FImageManager.ActiveFrame-1, AlphaBitmapSecondBufferFrame);
+     end;
+      FBufferImage.Canvas.CopyRect(Rect(0,0, Image.Width, Image.Height), Image.Canvas,Rect(0,0, Image.Width, Image.Height));
+     //Получаем редактор
+     anEditor:= FImageManager.GetEditor;
+     anEditor.ModifyFrame(FImageManager.ActiveFrame, FBufferImage);
+     FImageManager.Repaint;
+   end;
+   ISFirstCall := true;
+end;
+
+// Если точка находится внутри прямоугольника
+
+function TForm1.ISINSelectedRectangle(aX, aY: Integer): Boolean;
+var
+  Temp: Integer;
+begin
+// Заменяем местами если прямоугольник строился в обратном направлении
+  if FoldX > FOldX1 then begin
+    Temp := FoldX;
+    FoldX := FOldX1;
+    FOldX1 :=Temp;
+  end;
+
+  if FoldY > FOldY1 then begin
+    Temp := FoldY;
+    FoldY := FOldY1;
+    FOldY1 := Temp;
+  end;
+
+  if ((aX>FoldX) and (aY>FoldY) and(aX<FoldX1) and (aY<FOldY1)) then begin
+    Result := true;
+  end else begin
+    Result := false;
+  end;
+end;
+
+function TForm1.IsLeftMouseClick(aShift: TShiftState): Boolean;
+begin
+  Result := ssLeft in aShift;
+end;
+
+function TForm1.IsRightMouseClick(aShift: TShiftState): Boolean;
+begin
+  Result:= ssRight in aShift;
+end;
+
+procedure TForm1.GradientBrushClick(Sender: TObject);
+begin
+  FCurrentInstrument := ttMagicBrush;
+end;
+
+procedure TForm1.MoveBrushToCoordinat(aX, aY: Integer; aCanvas: TCanvas);
+begin
+  aCanvas.MoveTo(aX, aY);
+end;
+
+procedure TForm1.SaveToFileClick(Sender: TObject);
+begin
+// созраняем данные
+  if SaveDialog.Execute then begin
+    F
+
+  end;
+
+end;
+
+procedure TForm1.OpacityBarChange(Sender: TObject);
+begin
+  FOpaCity:= OpacityBar.Position;
+end;
+
+procedure TForm1.DrawQuadrat(aX, aY: Integer; aCanvas: TCanvas; aColor: TColor);
+begin
+  aCanvas.Pen.Mode := pmMask;
+  aCanvas.Pen.Color := aColor;
+  aCanvas.CopyRect(Rect(0,0, Image.Width, Image.Height), FBufferImage.Canvas,Rect(0,0, Image.Width, Image.Height));
+  aCanvas.Rectangle(FOldX, FOldY, aX, aY);
+end;
+
+procedure TForm1.DrawSelectQuadrat(aX, aY: Integer; aCanvas: TCanvas);
+begin
+  aCanvas.Pen.Mode := pmMask;
+  aCanvas.CopyRect(Rect(0,0, Image.Width, Image.Height), FBufferImage.Canvas,Rect(0,0, Image.Width, Image.Height));
+  aCanvas.Pen.Style := psDash;
+  aCanvas.Pen.Color := clGrayText;
+  aCanvas.Pen.Width := 2;
+  aCanvas.Rectangle(FOldX, FOldY, aX, aY);
+end;
+
+procedure TForm1.SelectRectangle(aX, aY: Integer);
+begin
+// Буфер выделения рисуем прямоугольник(Clear очистка)
+
+  FSelectBuffer.Canvas.Rectangle(-1,-1, FSelectBuffer.Width, FSelectBuffer.Height);
+// Режим рисования устанавливаем "по маске"
+  FSelectBuffer.Canvas.Pen.Mode := pmMask;
+  // Рисуем изображение на SelectBuffer, рисуем изображение рисунка
+ //FSelectBuffer.Canvas.Draw(0,0, FBufferImage);
+  FSelectBuffer.Canvas.CopyRect(Rect(0,0, Image.Width, Image.Height), FBufferImage.Canvas,Rect(0,0, Image.Width, Image.Height));
+  //  Рисуем прямоугольник
+    // Стиль рисования устанавливаем линии
+  FSelectBuffer.Canvas.Refresh;
+  FSelectBuffer.Canvas.Pen.Style := psDot;
+  FSelectBuffer.Canvas.Rectangle(fOldX, FOldY, aX, aY);
+  // ЗАпоминаем текущие коррдинаты
+  FOldX1 := aX;
+  FOldY1 := aY;
+  // На экран выводим наш select Buffer (А он в свою очередь является слоенным пирогом 2 итзображени)
+  Image.Canvas.Draw(0, 0, FSelectBuffer);
+end;
+
+procedure TForm1.SelectRegionClick(Sender: TObject);
+begin
+  FCurrentInstrument := ttSelect;
+end;
+
+// Меняем курсор на изменение размера
+procedure TForm1.SetDefaultCursor;
+begin
+  Image.Cursor := crDefault;
+end;
+
+procedure TForm1.SetImageBufferSize(aX, aY: Integer);
+begin
+  // Устанавливаем размер буфера в соотствии с областью выделения
+  FSelectBuffer.SetSize(abs(FoldX-FOldX1),Abs(FoldY-FOldY1));
+  // Копируем изображение внутри области
+  FSelectBuffer.Canvas.CopyRect(Rect(0, 0, abs(FoldX-FOldX1),Abs(FoldY-FOldY1)),
+  FBufferImage.Canvas, Rect(FoldX, FoldY, FOldX1, FOldY1));
+  FOldX2 := aX;
+  FOldY2 := aY;
+end;
+
+procedure TForm1.SetResizeCursor;
+begin
+  Image.Cursor := crSizeAll;
+end;
+
+procedure TForm1.CreateAviFileClick(Sender: TObject);
+var
+  aWorkDirectory: String;
+  aConverter: String;
+  aCommandString: String;
+  aBitmap: TBitmap;
+  anEditor: TFileFilmEditor;
+  aStartFile: String;
+  aEndFile: String;
+  anOutput: String;
+begin
+  aWorkDirectory := GetCurrentDir; // Получаем текущий каталог
+  aConverter := IncludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(aWorkDirectory)+'ExtProgramm\BmpToAviApp\')+'BmpToAvi.exe';
+  // Надо получить список файлов которые нужно конвертировать
+  anEditor:= FImageManager.GetEditor as TFileFilmEditor;
+  aStartFile := anEditor.StartFileName;
+  aEndFile := anEditor.EndFileName;
+  anOutput := 'multfilm.avi';
+  aCommandString:= '-start "'+ aStartFile+ '" -end "'+ aEndFile + '" -framerate 12 - output '+anOutput;
+  CreateProc(aConverter, aCommandString,0);
+end;
+
+procedure TForm1.SpeedButton1Click(Sender: TObject);
+begin
+  if FCurrentInstrument = ttSelect then begin
+    RestoreImageByBufer;
+  end;
+  FCurrentInstrument := ttPencil;
+end;
+
+procedure TForm1.SpeedButton2Click(Sender: TObject);
+begin
+  FCurrentInstrument := ttFill;
+end;
+
+procedure TForm1.DrawCircleClick(Sender: TObject);
+begin
+ if FCurrentInstrument = ttSelect then begin
+    RestoreImageByBufer;
+  end;
+ FCurrentInstrument := ttCircle;
+end;
+
+procedure TForm1.DrawRectangleClick(Sender: TObject);
+begin
+  if FCurrentInstrument = ttSelect then begin
+    RestoreImageByBufer;
+  end;
+  FCurrentInstrument := ttKvadrat;
+end;
+
+procedure TForm1.SpeedButton7Click(Sender: TObject);
+begin
+  if ColorDialog.Execute(Self.Handle) then begin
+    //ctiveColor := ColorDialog.Color;
+    //ctiveColorBox.Repaint;
+  end;
+end;
+
+procedure TForm1.StartAnimationClick(Sender: TObject);
+begin
+  Timer1.Enabled := True;
+end;
+
+procedure TForm1.Timer1Timer(Sender: TObject);
+var
+  aBitmap: TBitmap;
+begin
+  //
+ if (FCurrentPlay < FImageManager.ActiveFrame) then begin
+   aBitmap:= TBitmap.Create;
+   try
+      FImageManager.GetEditor.GetFrame(FCurrentPlay, aBitmap);
+      Image.Canvas.Draw(0,0, aBitmap);
+      FCurrentPlay:= FCurrentPlay+1;
+   finally
+      aBitmap.Free;
+   end;
+ end
+ else begin
+    FCurrentPlay := 0;
+    Timer1.Enabled := False;
+//    FImageManager.ActiveFrame := 0;
+    FImageManager.Repaint;
+ end;
+
+end;
+
+
+procedure TForm1.UpdateMagicBrushColor;
+begin
+  if(Assigned(aMagicBrush)) then begin
+    aMagicBrush.ActiveColor := ActiveColor;
+  end;
+
+end;
+
+procedure TForm1.BitBtn2Click(Sender: TObject);
+begin
+  if ColorDialog.Execute(Self.Handle) then begin
+     AdditionalColor := ColorDialog.Color;
+     AdditionalColorBox.Repaint;
+  end;
+end;
+
+procedure TForm1.ActiveColorButtonClick(Sender: TObject);
+begin
+  if ColorDialog.Execute(Self.Handle) then begin
+     ActiveColor := ColorDialog.Color;
+     ActiveColorBox.Repaint;
+     UpdateMagicBrushColor;
+  end;
+end;
+
+procedure TForm1.AdditionalColorBoxPaint(Sender: TObject);
+begin
+  ActiveColorBox.Canvas.Pen.Color := clBlack;
+  AdditionalColorBox.Canvas.Brush.Color := AdditionalColor;
+  AdditionalColorBox.Canvas.FillRect(Rect(1,1,41,41));
+end;
+
+
+procedure TForm1.ActiveColorBoxPaint(Sender: TObject);
+begin
+//
+  ActiveColorBox.Canvas.Pen.Color := clBlack;
+  ActiveColorBox.Canvas.Brush.Color := ActiveColor;
+  ActiveColorBox.Canvas.FillRect(Rect(1,1,41,41));
+
+end;
+
+procedure TForm1.PenWithBarChange(Sender: TObject);
+begin
+  Image.Canvas.Pen.Width := PenWithBar.Position;
+end;
+
+procedure TForm1.RememeberCoordinat(aX, aY: Integer);
+begin
+  FoldX := aX;
+  FoldY := aY;
+end;
+
+procedure TForm1.RestoreImageByBufer;
+begin
+  Image.Canvas.CopyRect(Rect(0,0, Image.Width, Image.Height), FBufferImage.Canvas,Rect(0,0, Image.Width, Image.Height));
+end;
+
+end.

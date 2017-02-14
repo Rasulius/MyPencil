@@ -1,0 +1,198 @@
+unit FilmManager;
+
+interface
+
+uses SysUtils, Graphics, FilmEditor, ExtCtrls, Controls;
+
+{*
+Функция киноленты, позволяет двигать ленту вправо или влево.
+можно получить Editor. Editor является агрегатом Фильм - менеджера
+*}
+
+const
+  FILM_EDITOR_DONT_ASSIGNED = 'менеджер не связан с редактором';
+  EDITOR_NOT_ASSIGNED = 'не инициализирован реадктор';
+
+type
+  TFrameSize = (fsSmall, fsMedium, fsBig);
+  TFilmManager = class
+  private
+    CurrentSelectFrame: Integer;
+    FEditor: TFilmEditor;
+  public
+    constructor Create; virtual; abstract;
+   // Рисовать на компоненте image интервал рисунков
+    procedure DrawByFrameInterval(aStartIndex: Integer; aEndIndex: Integer); virtual; abstract;
+    // Двигать ленту вправо
+    procedure MoveLentToRight; virtual; abstract;
+    // ДВигать ленту влево
+    procedure MoveLentToLeft; virtual; abstract;
+    procedure OnSelect(anXm, anY: Integer); virtual; abstract;
+    function GetEditor: TFilmEditor; virtual; abstract;
+    procedure Repaint; virtual; abstract;
+  end;
+
+
+  TImageBoxFilmManager = class(TFilmManager)
+  protected
+    const DrawFrameCount = 10; // Сколько кадров отображать по умолчанию
+    const DefaultImage = 0;
+  private
+
+
+    FImage: TImage;
+    FActiveFrame: Integer;
+    FCurrentStartFrame: Integer;
+    FImageList: TImageList;
+    procedure InitFilmEditor;
+    procedure SetActiveFrame(const Value: Integer);
+
+  public
+    constructor Create(); override;
+    procedure InitImage(anImage: TImage; anImageList: TImageList);
+
+
+    procedure DrawByFrameInterval(aStartIndex: Integer; aEndIndex: Integer); override;
+    // Двигать ленту вправо
+    procedure MoveLentToRight; override;
+    // ДВигать ленту влево
+    procedure MoveLentToLeft; override;
+    procedure OnSelect(anXm, anY: Integer); override;
+    function GetEditor: TFilmEditor; override;
+    procedure Repaint; override;
+
+    property ActiveFrame: Integer read FActiveFrame write SetActiveFrame;
+  end;
+
+
+implementation
+
+uses ImageUtils;
+
+{ TImageBoxFilmManager }
+
+constructor TImageBoxFilmManager.Create;
+var
+  aFabric: TEditorFabrics;
+begin
+  CurrentSelectFrame := -1;
+  FActiveFrame:= 0;
+  aFabric := TEditorFabrics.Create;
+  try
+    FEditor := aFabric.CreateFilmEditor(feBitmapFileEditor);
+    // Инициализируем меджер кадров
+    InitFilmEditor;
+  finally
+    aFabric.Free;
+  end;
+
+end;
+
+
+
+function TImageBoxFilmManager.GetEditor: TFilmEditor;
+begin
+  if not Assigned(FEditor) then begin
+    raise Exception.Create(FILM_EDITOR_DONT_ASSIGNED);
+  end;
+  Result := FEditor;
+
+end;
+
+procedure TImageBoxFilmManager.DrawByFrameInterval(aStartIndex,
+  aEndIndex: Integer);
+begin
+  {* Получить уменьшенные изображения рисунков и нарисовать их друг за другом *}
+  if not Assigned(FEditor) then begin
+    raise Exception.Create(FILM_EDITOR_DONT_ASSIGNED);
+  end;
+  //
+end;
+
+// Инициализация отображения раскадровки
+
+procedure TImageBoxFilmManager.InitFilmEditor;
+var
+  aBitmap: TBitmap;
+  i: Integer;
+begin
+  aBitmap := TBitmap.Create;
+  try
+  // Добавляем первый кадр
+    aBitmap.SetSize(640, 480);
+    FEditor.AddFrame(aBitmap);
+    // Создаем 10 кадров копированием из первого
+    for i := 1 to DrawFrameCount do begin
+      FEditor.CopyFrame(0, i);
+    end;
+
+  finally
+    aBitmap.Free;
+  end;
+end;
+
+procedure TImageBoxFilmManager.InitImage(anImage: TImage; anImageList: TImageList);
+begin
+  FImage := anImage;
+  FImageList := anImageList;
+end;
+
+// Процедура перерисовки кадров
+
+procedure TImageBoxFilmManager.Repaint;
+var
+  aBitmap: TBitmap;
+  aScaleImages: TBitmap;
+  i: Integer;
+begin
+  aBitmap:= TBitmap.Create;
+  try
+  // Перебереаем картинки из начального состояние до (кадры который умещается в ленту.)
+
+     aScaleImages:= TBitmap.Create;
+
+     try
+        for I := FCurrentStartFrame to DrawFrameCount - 1 do begin
+         // Если кадр существует, то копируем его и пропорционально уменьшаем
+          if FEditor.FrameExist(i) then begin
+             FEditor.GetFrame(i, aBitmap);
+             ResizeImage(aBitmap, aScaleImages, 60, PROPRTIONAL_RESIZE);
+          end else begin
+             aScaleImages.SetSize(60,80);
+          end;
+          // Рисуем изображение пленки и на его фоне выводим изображение
+            FImageList.GetBitmap(DefaultImage, aBitmap);
+            FImage.Canvas.Draw(i*aBitmap.Width+10, 0, aBitmap);
+            FImage.Canvas.Draw(i*aBitmap.Width+12,20, aScaleImages);
+      end;
+
+     finally
+      aScaleImages.Free;
+     end;
+//    FImage.Canvas.Draw();
+  finally
+    aBitmap.Free;
+  end;
+end;
+
+
+procedure TImageBoxFilmManager.SetActiveFrame(const Value: Integer);
+begin
+  FActiveFrame := Value;
+end;
+
+procedure TImageBoxFilmManager.MoveLentToLeft;
+begin
+
+end;
+
+procedure TImageBoxFilmManager.MoveLentToRight;
+begin
+
+end;
+
+procedure TImageBoxFilmManager.OnSelect(anXm, anY: Integer);
+begin
+
+end;
+end.

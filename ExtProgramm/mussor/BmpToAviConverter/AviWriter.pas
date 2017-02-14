@@ -1,0 +1,962 @@
+ unit AviWriter;
+
+//-----------------------------------------------
+// AVI-Writer Shagimardanov_Rasul
+// This class d"ont use Directx? DXShow and Windwos AVI write api
+// This class write avi by Image series
+
+
+
+interface
+
+// Массив указателей.
+
+uses Windows, SysUtils, Graphics, Classes, Character;
+
+type
+  TInput = array of PChar;
+  TSName = array [0..4] of Char;
+
+  TDistributorInformation = record
+    Author: String;
+    License: String;
+    Contact: String;
+    Group: String;
+  end;
+
+  TAVICreateParams = class
+  private
+    FProjectDirectory: String;
+    FFrameRate: Extended;
+    FFileList: TStringList;
+    FOutputFile: String;
+    FOutputDirectory: String;
+    FStartFrameNumber: Integer;
+    FWidth: Integer;
+    FHeight: Integer;
+ public
+    constructor Create(aProjectDirectory: String; aFileList: TStringList; aFrameRate: Extended;
+      aOutputFileName: String; aOutputDirectory: String; aStartFrameNumber: Integer;
+        aWidth, aHeight: Integer);
+    destructor Destroy;
+
+    property Width: Integer read FWidth;
+    property Height: Integer read FHeight;
+  end;
+
+
+  TInterpolationFunction =  function (aBMP, aBmp2: TBitmap; Iteration: Integer;
+    SmoothingFactor: Integer;var anOut: TBitmap): boolean  of object;
+const
+  AVIF_HASINDEX = 16;
+  AVIF_CPYRIGHTED = 131072;
+  DefaultXPelsPerMeter = 3780;
+  DefaultYPelsPerMeter = 3780;
+
+type
+
+  TSimpleAVIWriter = class
+  private
+     FFlaglist: TStringList;
+     FNumderOfFlags: Integer;
+     FStartFrame: Integer;
+     FEndFrame: Integer;
+     FFrameRate: Extended;
+     FFileNameIncrement: Integer;
+     FNumberOfFrames: Integer;
+     FNumberOfDigitsInFileNames: Integer;
+     FBitsPerPixel: Integer;
+     FInputFileNameBase: String; // Наименование входного файла (name000001.bmp)
+     FOutputFileName: String;
+     FProjectDirectory: String;  // D:\Project\Mult\1\
+
+
+     FFileList: String;
+     FListOfInputFiles: TStringList;
+     FSetCopyrightBit: Boolean;
+//     FUseBigEndian: Boolean;
+     FWidth: Integer;
+     FHeight: Integer;
+     FSmoothingFactor: Integer;
+     FRescaleOn: Boolean;
+     FRescaleMode: char;
+     FRescaleSize: Integer;
+     // Информация о файле
+
+
+     FDate: String;
+     FYear: String;
+     FAuthor: String;
+     FLicense: String;
+     FContact: String;
+     FGroup: String;
+
+     FParamARGC: integer;
+     FParamsARGV: TStringList;
+     FInterpolateFunction: TInterpolationFunction;
+  protected
+     // Записать информацию о заголовке
+     procedure LoadHeaderInformation;
+
+     function InterpolateFrames(aBMP, aBmp2: TBitmap; Iteration: Integer;
+        SmoothingFactor: Integer;var anOut: TBitmap): boolean;
+
+     function InterleaveFrames(aBMP, aBmp2: TBitmap; Iteration: Integer;
+        SmoothingFactor: Integer;var anOut: TBitmap): boolean;
+
+     function DetermineFrameDataSize: integer;
+     function CalculateFrameSize(aHeight, aWidth: Integer): Integer;
+     procedure InitializeFlagsList;
+
+     // Провекрка дополнительный флага( который приходит в консоли)
+     function CheckAdditionalFlags(aInput: String): integer;
+
+
+     function HandleFlag(aFlagNumber: Integer; aInput: String):Boolean;
+
+     procedure ResetGlobals();
+     procedure DetermineNumberOfDigitsInInputFiles();
+     procedure DisplayHelp();
+// Записываем простых типы данных
+     procedure WriteString(aFileStream: TFileStream; Input: String);
+     procedure WriteWORD (aFileStream: TFileStream; Input: Word);
+     procedure WriteInteger(aFileStream: TFileStream; Input: Integer);
+
+     procedure WriteChunk(aFileStream: TFileStream; aName: TSName;
+      aInput: String; aLength: Integer);
+
+      //
+     procedure WriteAVIH(aFileStream: TFileStream);
+     procedure WriteBMIH(aFileStream: TFileStream);
+     procedure WriteSTRH(aFileStream: TFileStream);
+
+     // Запись кадров
+     procedure WriteFrames(aFileStream: TfileStream);
+     procedure WriteFrame(aFileStream: TFileStream; Input: TBitmap; ImageSize: Word);
+
+     procedure DisplayProgress(StartFrame: Integer; CurrentFrame: Integer; EndFrame: Integer);
+
+
+     function CreateFilename(aBase: String; Number: Integer; NumberOfPlaces: Integer): String;
+
+     // Чтение и запись данных
+     function WriteBufferToFile(aFileStream: TFileStream; aBuffer: String; aBufferLength: Integer): Integer;
+     function ReadFileToBuffer(aFileStream: TFileStream; out aBuffer: String; BufferLength: integer): Integer;
+
+     function InvertBufferOrder(var aBuffer: String; aBufferLength: Integer ): Boolean;
+
+     procedure CheckVideoParametrs;
+     procedure CheckFlags;
+     function GetFileCouter: Integer;
+     procedure CreateFileList;
+     procedure AdjustFrameRate;
+     procedure WriteAviHeaderData(aFileStream: TFileStream);
+
+
+     procedure AssignVideoParametrs(aParams: TAVICreateParams);
+
+     procedure LoadFileByIndex(aBitmap: TBitmap; const Index: Integer);
+  public
+     // Инициализация данных
+     procedure ConvertBMPSeriesToAvi(aParams: TAVICreateParams);
+
+     constructor Create;
+     destructor Destroy; override;
+
+end;
+
+
+implementation
+
+{ TSimpleAVIWriter }
+
+
+// Инциализация данных
+
+constructor TSimpleAVIWriter.Create;
+begin
+// Создаем необходимые переменные
+  FFlaglist := TStringList.Create;
+  FListOfInputFiles := TStringList.Create;
+  FParamsARGV := TStringList.Create;
+  ResetGlobals;   // Сбрасываем глобальные переменные
+end;
+
+destructor TSimpleAVIWriter.Destroy;
+begin
+  FFlaglist.Free;
+  FListOfInputFiles.Free;
+  FParamsARGV.Free;
+  inherited;
+end;
+
+// Конвертирование
+
+procedure TSimpleAVIWriter.ConvertBMPSeriesToAvi(aParams: TAVICreateParams);
+var
+  aFileStream: TFileStream;
+begin
+  LoadHeaderInformation; // Заполняем заголовочные данные
+  InitializeFlagsList;   // Инициализируем флаги
+  AssignVideoParametrs(aParams);// Связываем параметры создания видео файла
+
+  CheckVideoParametrs; // Проверяем параметры видео
+////////////////////////////////////////////////////////////////////////////////
+  GetFileCouter;
+  // Если список фалов нам подали извне то не создаем список файлов
+  if FListOfInputFiles.Count = 0 then begin
+    CreateFileList;   // Создаем список входных файлов
+  end;
+
+  aFileStream := TFileStream.Create(FOutputFileName, fmCreate or fmOpenReadWrite);   // создание или перезапись
+  try
+    WriteAviHeaderData(aFileStream);
+    WriteFrames(aFileStream);
+  finally
+    aFileStream.Free;
+  end;
+
+end;
+// Запись списка кадров
+
+procedure TSimpleAVIWriter.WriteFrames(aFileStream: TfileStream);
+var
+  aFrameSize: Integer;
+  aFrameNumber: Integer;
+  aBitmap: TBitmap;
+  aIndexSize: Integer;
+  i,j: Integer;
+  ChunkOffset: Integer;
+begin
+
+  aFrameNumber := 0;
+  ChunkOffset := 4;
+
+  while aFrameNumber< FNumberOfFrames do begin
+    DisplayProgress(0,aFrameNumber, FNumberOfFrames-1);
+    aBitmap := TBitmap.Create;
+    try
+      LoadFileByIndex(aBitmap, aFrameNumber);
+      aFrameSize := CalculateFrameSize(aBitmap.Height, aBitmap.Width);
+      WriteFrame(aFileStream, aBitmap, aFrameSize);
+      Inc(aFrameNumber);
+    finally
+      aBitmap.Free;
+    end;
+  end;
+  WriteString(aFileStream,'idx1');
+  aIndexSize := (FSmoothingFactor*(FNumberOfFrames-1)+1)*16;
+  WriteInteger(aFileStream, aIndexSize);
+
+  for i := 1 to FSmoothingFactor*(FNumberOfFrames-1)+1 do begin
+     if( i = FEndFrame) then begin
+       Exit;
+     end;
+
+     for j:=0  to FSmoothingFactor do begin
+        WriteString(aFileStream, '00db');
+        WriteInteger(aFileStream, 16); // keyframe
+        WriteInteger(aFileStream, ChunkOffset);
+        ChunkOffset := ChunkOffset + aFrameSize+8;
+        WriteInteger(aFileStream, aFrameSize);
+     end;
+  end;
+
+end;
+
+// Процедура устанавливает начальные значения для процедуры
+
+procedure TSimpleAVIWriter.ResetGlobals;
+begin
+  FStartFrame := -1;
+  FEndFrame := -1;
+  FFrameRate := -1;
+  FNumberOfDigitsInFileNames := -1;
+  FSetCopyrightBit := false;
+  FFileNameIncrement :=1;
+  FInputFileNameBase := '';
+  FOutputFileName := '';
+  FFileList := '';
+  FListOfInputFiles.Clear;
+  FFlaglist.Clear;
+  FInterpolateFunction := InterpolateFrames;
+  FSmoothingFactor := 1;
+  FRescaleMode := 'P';
+  FRescaleSize := 100;
+end;
+
+// иницализатция
+
+procedure TSimpleAVIWriter.CheckFlags;
+var
+  i,j: Integer;
+  Done: Boolean;
+begin
+   i := 1;
+  while (i<FParamARGC) do begin
+    j := CheckAdditionalFlags(FParamsARGV[i]);
+    Done := false;
+
+    if j=-1 then begin
+      Done := true;
+    end;
+
+    if (j=1) or (j=7) then begin // ??? насчет 7
+      HandleFlag(j, ' ');
+      Done := true;
+    end;
+
+    if not Done then begin
+      Inc(i);
+      HandleFlag(j, FParamsARGV[i]);
+    end else begin
+      Inc(i);
+    end;
+  end;
+end;
+
+procedure TSimpleAVIWriter.CheckVideoParametrs;
+begin
+//
+ // check to see if any information is missing
+  if (FStartFrame =-1)and (Length(FFileList)=0) then begin
+     raise Exception.Create('not intialized start frame number');
+  end;
+
+  if (FEndFrame=-1)and(Length(FFileList)=0) then begin
+     raise Exception.Create('not intialized end frame number');
+  end;
+
+//  if ((Length(FInputFileNameBase)=0) and (Length(FFileList) = 0) ) then begin
+//     raise Exception.Create('not intialized file name base');
+//  end;
+
+  if(FFrameRate < 0) then begin
+    raise Exception.Create('not intialized frame rate');
+  end;
+
+  if (Length(FOutputFileName)=0) then begin
+    raise Exception.Create('not intialized output File name');
+  end;
+
+end;
+
+function TSimpleAVIWriter.GetFileCouter: Integer;
+begin
+  FNumberOfFrames := 0; // количество кадров
+  Result := FStartFrame;
+
+  while Result <= FEndFrame do begin
+    Inc(FNumberOfFrames);
+    Result := Result + FFileNameIncrement;
+  end;
+end;
+
+procedure TSimpleAVIWriter.CreateFileList;
+var
+  aFileName: String;
+  i: Integer;
+begin
+  FFileList := '';
+  for i := 0 to FNumberOfFrames - 1 do begin
+    aFileName := CreateFilename(FInputFileNameBase, FStartFrame+i*FFilenameIncrement,FNumberOfDigitsInFileNames);
+    FListOfInputFiles.Add(aFileName);
+  end;
+end;
+
+procedure TSimpleAVIWriter.AdjustFrameRate;
+begin
+  FFrameRate := FFrameRate*FSmoothingFactor;
+  if FSmoothingFactor > 1 then begin
+
+  end;
+end;
+
+//Проверка дополнителньых флагов
+
+procedure TSimpleAVIWriter.AssignVideoParametrs(aParams: TAVICreateParams);
+begin
+  FProjectDirectory := aParams.FProjectDirectory;
+  FListOfInputFiles.Assign(aParams.FFileList);
+  FOutputFileName := aParams.FOutputFile;
+  FFrameRate := aParams.FFrameRate;
+  FWidth := aParams.Width;
+  FHeight:= aParams.Height;
+
+  FStartFrame := 0;
+  FEndFrame := FListOfInputFiles.Count-1;
+end;
+
+function TSimpleAVIWriter.CalculateFrameSize(aHeight, aWidth: Integer): Integer;
+begin
+  Result := ((aWidth*FBitsPerPixel) div 8);
+  while(Result mod 4)>0 do begin
+    inc(Result);
+  end;
+  Result := Result*aHeight;
+end;
+
+function TSimpleAVIWriter.CheckAdditionalFlags(aInput: String): integer;
+var
+  i: Integer;
+  j: Integer;
+  isMatch: Boolean;
+begin
+  i:= 1;
+  if(aInput[1] <> '-' )then begin
+    Result := -1;
+    Exit;
+  end;
+
+  while i < FNumderOfFlags do begin
+    j:= 1;
+    isMatch := true;
+    while (j<length(aInput)) and (j < FFlaglist.Count) do begin
+       if(aInput[j+1]<> FFlaglist[i][j]) then begin
+         isMatch := false;
+       end;
+       inc(j);
+    end;
+
+    // Если количество параметров не равно количество строк то не отлавливаем
+    if Length(aInput)<>FFlaglist.Count+1 then begin
+      isMatch := False;
+    end;
+    // Если выловили то хорошо
+    if isMatch = true then begin
+      Result := i;
+      Exit;
+    end;
+    inc(i);
+  end;
+
+  Result := -1;
+end;
+
+
+function TSimpleAVIWriter.CreateFilename(aBase: String; Number: Integer;
+  NumberOfPlaces: Integer): String;
+var
+  aFormatString: String;
+begin
+  aFormatString := '%s%.'+IntToStr(NumberOfPlaces)+'d.bmp';
+  Result := Format(aFormatString,[aBase,Number]);
+end;
+
+// Вычисление размера одного кадра
+
+function TSimpleAVIWriter.DetermineFrameDataSize: integer;
+begin
+  Result := ((FWidth*FBitsPerPixel) div 8);
+  while(Result mod 4)>0 do begin
+    inc(Result);
+  end;
+  Result := Result*FHeight;
+end;
+// Вычисление количества файлов в каталоге, перебираем файлы, для этого формируем
+// наименование? проверяем существует, ли такой файл
+
+
+procedure TSimpleAVIWriter.DetermineNumberOfDigitsInInputFiles;
+var
+  aFileExist: Boolean;
+  aFileName: String;
+begin
+  repeat
+    inc(FNumberOfDigitsInFileNames);
+    aFileName := CreateFilename(FInputFileNameBase,FStartFrame,FNumberOfDigitsInFileNames);
+    aFileExist := FileExists(IncludeTrailingPathDelimiter(FProjectDirectory)+aFileName);
+  until(aFileExist);
+end;
+
+procedure TSimpleAVIWriter.DisplayHelp;
+begin
+//
+end;
+
+procedure TSimpleAVIWriter.DisplayProgress(StartFrame, CurrentFrame,
+  EndFrame: Integer);
+begin
+
+end;
+
+
+
+function TSimpleAVIWriter.HandleFlag(aFlagNumber: Integer;
+  aInput: String): Boolean;
+var
+  i,j: Integer;
+  aSearchDone: Boolean;
+begin
+  i:=0;
+  aSearchDone := False;
+  Result := true;
+
+  if((aFlagNumber>= FNumderOfFlags) or (aFlagNumber<0)) then begin
+    Result := False;
+    Exit;
+  end;
+
+  if aFlagNumber = 0 then begin
+     DisplayHelp;
+  end;
+
+  if aFlagNumber = 1 then begin
+    FFrameRate := StrToFloat(aInput);
+  end;
+
+  if aFlagNumber = 2 then begin
+
+    if  not IsDigit(aInput[1]) then begin
+      i := Length(aInput)-5; // ?????
+      aSearchDone := false;
+
+      while ((i>0) AND (not aSearchDone)) do begin
+        if(isdigit(aInput[i])) then begin
+          Dec(i)
+        end else begin
+          aSearchDone := false;
+        end;
+      end;
+
+      // Копирование имени файла
+      j := 1;
+      while  j <= i do begin
+       FInputFileNameBase[j] := aInput[j];
+       inc(j);
+      end;
+       FInputFileNameBase[j] := #13;
+       // get the first and last frame numbers
+       j:=1;
+       while  j <= i do begin
+            aInput[j] := ' ';
+            inc(j);
+          	FStartFrame := StrToInt(aInput);
+       end;
+
+    end else begin
+      FStartFrame := StrToInt(aInput);
+    end;
+    if aFlagNumber = 3 then begin
+
+       if(not isdigit(aInput[1])) then begin
+          i:= Length(aInput)-5;  // ????
+          aSearchDone := False;
+       end;
+
+       while ((i>0)and(not aSearchDone) ) do begin
+         if IsDigit(aInput[i]) then begin
+           dec(i)
+         end else begin
+           aSearchDone := true;
+         end;
+       end;
+
+       j := 1;
+       while( j <= i ) do begin
+         FInputFileNameBase[j] := aInput[j];
+         inc(j);
+       end;
+
+       FInputFileNameBase[j] := #13;
+       // get the first and last frame numbers
+        j:=1;
+        while( j <= i ) do begin
+          aInput[j] := ' ';
+          inc(j);
+        end;
+        FEndFrame :=  StrToInt(aInput);
+    end else begin
+      FEndFrame :=  StrToInt(aInput);
+    end;
+
+    if aFlagNumber = 4 then begin
+      FInputFileNameBase := Copy(aInput,1, length(aInput));
+      Result := true;
+      Exit;
+    end;
+
+    if aFlagNumber = 5 then begin
+      FOutputFileName := Copy(aInput,1, length(aInput));
+      Result := true;
+      Exit;
+    end;
+
+    if aFlagNumber = 6 then begin
+      FFileList :=  Copy(aInput,1, length(aInput));
+      Result := true;
+      Exit;
+    end;
+
+    if aFlagNumber = 7 then begin
+      FSetCopyrightBit := true;
+      Writeln('Copyright bit will be set in output file.');
+      Result := true;
+      Exit;
+    end;
+
+    if aFlagNumber = 8 then begin
+
+      FSmoothingFactor := StrToInt(aInput);
+      if FSmoothingFactor < 1 then begin
+        FSmoothingFactor := 1;
+      end;
+      Result := true;
+      Exit;
+    end;
+
+    if aFlagNumber = 9 then begin
+      FInterpolateFunction := InterleaveFrames;
+      Writeln('Notice: Using experimental frame interleaving');
+      Result := true;
+      Exit;
+    end;
+
+    if aFlagNumber = 10 then begin
+      FFileNameIncrement := StrToInt(aInput);
+      if (FFileNameIncrement)<1 then
+        FFileNameIncrement := 1;
+      Result := true;
+      Exit;
+    end;
+
+    if aFlagNumber = 11 then begin
+      FRescaleOn := true;
+      FRescaleMode := aInput[1];
+      aInput[1] := ' ';
+      FRescaleSize := StrToInt(aInput);
+      Result := true;
+      Exit;
+    end;
+  end;
+end;
+
+// Иницализация флягов  TStringList Лсчитывается от нуля
+
+procedure TSimpleAVIWriter.InitializeFlagsList;
+begin
+  FFlaglist.Add('help');
+  FFlaglist.Add('framerate');
+  FFlaglist.Add('start');
+  FFlaglist.Add('end');
+  FFlaglist.Add('filebase');
+  FFlaglist.Add('output');
+  FFlaglist.Add('filelist');
+  FFlaglist.Add('copyright');
+  FFlaglist.Add('smooth');
+  FFlaglist.Add('interleave');
+  FFlaglist.Add('increment');
+  FFlaglist.Add('rescale');
+end;
+
+function TSimpleAVIWriter.InterleaveFrames(aBMP, aBmp2: TBitmap; Iteration,
+  SmoothingFactor: Integer; var anOut: TBitmap): boolean;
+var
+  i,j: Integer;
+begin
+  for i := 1 to anOut.Height do begin
+    for j := 1 to anOut.Width do begin
+       if((j mod SmoothingFactor) >= Iteration) then begin
+          anOut.Canvas.Pixels[i,j] := aBMP.Canvas.Pixels[i,j];
+       end else begin
+          anOut.Canvas.Pixels[i,j] := aBMP2.Canvas.Pixels[i,j];
+       end;
+    end;
+  end;
+  Result := true;
+end;
+
+function TSimpleAVIWriter.InterpolateFrames(aBMP, aBmp2: TBitmap; Iteration,
+  SmoothingFactor: Integer; var anOut: TBitmap): boolean;
+var
+  i,j: Integer;
+  aRed,aGreen, aBlue: Byte;
+  t: Extended;
+  aTemp1, aTemp2: Extended;
+begin
+  t := Iteration/SmoothingFactor;
+
+  for i := 1 to anOut.Height do begin
+    for j := 1 to anOut.Width do begin
+      aTemp1 := GetRValue(aBMP.Canvas.Pixels[i,j]);
+      aTemp2 := GetRValue(aBMP2.Canvas.Pixels[i,j]);
+      aRed := Trunc((1-t)*aTemp1+t*(aTemp2));
+
+      aTemp1 := GetGValue(aBMP.Canvas.Pixels[i,j]);
+      aTemp2 := GetGValue(aBMP2.Canvas.Pixels[i,j]);
+      aGreen := Trunc((1-t)*aTemp1+t*(aTemp2));
+
+      aTemp1 := GetBValue(aBMP.Canvas.Pixels[i,j]);
+      aTemp2 := GetBValue(aBMP2.Canvas.Pixels[i,j]);
+      aBlue := Trunc((1-t)*aTemp1+t*(aTemp2));
+      anOut.Canvas.Pixels[i,j] := RGB(aRed, aGreen, aBlue);
+    end;
+  end;
+  Result := true;
+end;
+
+function TSimpleAVIWriter.InvertBufferOrder(var aBuffer: String;
+  aBufferLength: Integer): Boolean;
+var
+  k: Integer;
+  j: Integer;
+  aTemp: Char;
+begin
+  for k := 1 to Length(aBuffer) div 2 do begin
+     j:= aBufferLength - k - 1;
+     aTemp := aBuffer[k];
+     aBuffer[k] := aBuffer[j];
+     aBuffer[j] := aTemp;
+   end;
+   Result := True;
+end;
+
+procedure TSimpleAVIWriter.LoadFileByIndex(aBitmap: TBitmap;
+  const Index: Integer);
+var
+  aCurrentFile: String;
+begin
+  // Загрузка фалй из директории
+  aCurrentFile:= FListOfInputFiles[Index];
+  aBitmap.LoadFromFile(IncludeTrailingPathDelimiter(FProjectDirectory) + ExtractFileName(aCurrentFile));
+end;
+
+procedure TSimpleAVIWriter.LoadHeaderInformation;
+var
+  aDate: TDateTime;
+  aYear, aMonth, aDay: Word;
+begin
+  aDate := Now; // Получение текущего времени
+  DecodeDate(aDate, aYear, aMonth, aDay); // Декодирование даты по компонентам
+  FDate := IntToStr(aDay)+'.'+IntToStr(aMonth)+'.'+IntToStr(aYear);
+  FYear := IntToStr(aYear);
+  FAuthor := 'Anyper Magic';
+  FLicense := 'Free license';
+  FContact := 'AnyperSoft@mail.ru';
+  FGroup   := 'Anyper Magic Group co ltd';
+end;
+
+procedure TSimpleAVIWriter.WriteAVIH(aFileStream: TFileStream);
+var
+  aPerSecFrame:    Integer;
+  aMaxBytesPerSec: Integer;
+  aReserved:       Integer;
+  aFlags:          Integer;
+  aTotalFrames:    Integer;
+  aInitialFrames:  Integer;
+  aStreams:        Integer;
+  aSuggestedBufferSize: Integer;
+  aWidth:          Integer;
+  aHeight:         Integer;
+  aScale:          Integer;
+  aRate:           Integer;
+  aStart:          Integer;
+  aLength:         Integer;
+begin
+  aPerSecFrame :=  Trunc(1000000 / FFrameRate);
+  aMaxBytesPerSec := 0;
+  aReserved := 0;
+  aFlags := AVIF_HASINDEX;
+
+  if(FSetCopyrightBit) then
+    aFlags := AVIF_CPYRIGHTED or aFlags;
+
+  aTotalFrames := FNumberOfFrames;
+  aInitialFrames := 0;
+  aStreams := 1; // Video only
+  aSuggestedBufferSize := DetermineFrameDataSize;
+  aWidth  := FWidth;
+  aHeight := FHeight;
+  aScale  := 0;
+  aRate   := 0;
+  aStart  := 0;
+  aLength := 0;
+
+  WriteInteger(aFileStream, aPerSecFrame);
+  WriteInteger(aFileStream, aMaxBytesPerSec);
+  WriteInteger(aFileStream, aReserved);
+  WriteInteger(aFileStream, aFlags);
+  WriteInteger(aFileStream, aTotalFrames);
+  WriteInteger(aFileStream, aInitialFrames);
+  WriteInteger(aFileStream, aStreams);
+  WriteInteger(aFileStream, aSuggestedBufferSize);
+  WriteInteger(aFileStream, aWidth);
+  WriteInteger(aFileStream, aHeight);
+  WriteInteger(aFileStream, aScale);
+  WriteInteger(aFileStream, aRate);
+  WriteInteger(aFileStream, aStart);
+  WriteInteger(aFileStream, aLength);
+end;
+
+procedure TSimpleAVIWriter.WriteAviHeaderData(aFileStream: TFileStream);
+var
+  aFileSize: Integer;
+  aFirstListSize: Integer;
+  aIndexSize: Integer;
+  aMoviSize: Integer;
+  aSecondListSize: Integer;
+begin
+  aIndexSize := (FSmoothingFactor*(FNumberOfFrames-1)+1)*16;
+  aMoviSize := 4+(FSmoothingFactor*(FNumberOfFrames-1)+1)*( DetermineFrameDataSize()+8);
+  aSecondListSize := 4+64+48;
+  aFirstListSize := (4+64) + (8+aSecondListSize);
+  aFileSize := 8+(8+aIndexSize) + (8+aFirstListSize) + (4+aMoviSize);
+
+  WriteString(aFileStream, 'RIFF');
+  WriteInteger(aFileStream, aFileSize);
+  WriteString(aFileStream, 'AVI');
+  WriteString(aFileStream, 'LIST');
+  WriteInteger(aFileStream, aFirstListSize);
+  WriteString(aFileStream, 'hdrl');
+  WriteString(aFileStream, 'avih');
+  WriteInteger(aFileStream, 56);
+  WriteAVIH(aFileStream);
+ //
+ // write the various headers
+ //
+  WriteString(aFileStream, 'LIST');
+  WriteInteger(aFileStream, aSecondListSize);
+  WriteString(aFileStream, 'strl');
+  WriteSTRH(aFileStream);
+  WriteString(aFileStream,'strf');
+  WriteInteger(aFileStream, 40);
+  WriteBMIH(aFileStream);
+  // write movie frame header
+  WriteString(aFileStream, 'LIST');
+  WriteInteger(aFileStream, aMoviSize);
+  WriteString(aFileStream, 'movi');
+end;
+
+procedure TSimpleAVIWriter.WriteBMIH(aFileStream: TFileStream);
+begin
+  if (FBitsPerPixel)<>24 then begin
+    FBitsPerPixel := 24;
+  end;
+  WriteInteger(aFileStream, 40);   // aSize
+  WriteInteger(aFileStream, FWidth);
+  WriteInteger(aFileStream, FHeight);
+  WriteInteger(aFileStream, 1);// planes
+  WriteInteger(aFileStream, FBitsPerPixel);
+  WriteInteger(aFileStream, 0); //compression
+  WriteInteger(aFileStream,DetermineFrameDataSize);
+  WriteInteger(aFileStream, DefaultXPelsPerMeter);
+  WriteInteger(aFileStream, DefaultYPelsPerMeter);
+  WriteInteger(aFileStream, 0);  //ClrUsed
+  WriteInteger(aFileStream, 0);  //ClrImportant
+end;
+
+procedure TSimpleAVIWriter.WriteSTRH(aFileStream: TFileStream);
+var
+  aPerSec: Integer;
+  aFrameSize: Integer;
+begin
+ WriteString(aFileStream, 'strh');
+ WriteInteger(aFileStream,56);
+ WriteString(aFileStream,'vids');
+ WriteString(aFileStream, 'DIB');
+ WriteInteger(aFileStream, 0); // flags
+ WriteInteger(aFileStream, 0); // priority
+ WriteInteger(aFileStream, 0); // initial frames
+ aPerSec := Trunc(1000000.0/FFrameRate);
+ WriteInteger(aFileStream, aPerSec); // dwScale
+ WriteInteger(aFileStream, 1000000); // dwRate
+ WriteInteger(aFileStream, 0); // dwStart
+ WriteInteger(aFileStream,  FNumberOfFrames); // dwLength
+ aFrameSize := DetermineFrameDataSize();
+ WriteInteger(aFileStream, aFrameSize); // dwSuggestedBufferSize
+ WriteInteger(aFileStream, 0); // dwQuality
+ WriteInteger(aFileStream, 0); // dwSampleSize
+ WriteInteger(aFileStream, 0);
+ WriteWORD(aFileStream,  FWidth);
+ WriteWORD(aFileStream, FHeight);
+end;
+
+function TSimpleAVIWriter.WriteBufferToFile(aFileStream: TFileStream; aBuffer: String;
+  aBufferLength: Integer): Integer;
+begin
+  Result := aFileStream.Write(aBuffer, aBufferLength);
+end;
+
+function TSimpleAVIWriter.ReadFileToBuffer(aFileStream: TFileStream;
+  out aBuffer: String; BufferLength: integer): Integer;
+begin
+  Result := aFileStream.Read(aBuffer, BufferLength);
+end;
+
+procedure TSimpleAVIWriter.WriteChunk(aFileStream: TFileStream; aName: TSName;
+      aInput: String; aLength: Integer);
+begin
+  //------------------
+end;
+
+
+
+procedure TSimpleAVIWriter.WriteString(aFileStream: TFileStream; Input: String);
+begin
+  aFileStream.WriteBuffer(Input, Length(Input)* SizeOf(Char));
+end;
+
+// Запись числа 0..65500
+
+procedure TSimpleAVIWriter.WriteWORD(aFileStream: TFileStream; Input: Word);
+begin
+  aFileStream.WriteBuffer(Input, SizeOf(Word));
+end;
+// Запись в файл числа с большой размером Integer;
+
+procedure TSimpleAVIWriter.WriteInteger(aFileStream: TFileStream; Input: Integer);
+begin
+  aFileStream.WriteBuffer(Input, SizeOf(Integer));
+end;
+
+procedure TSimpleAVIWriter.WriteFrame(aFileStream: TFileStream; Input: TBitmap; ImageSize: Word);
+var
+  i,j,k: Integer;
+  BytesPerRow: Integer;
+  LineBuffer: Pchar;     // Нужен или не нужен pchar
+  aColor: TColor;
+begin
+  WriteString(aFileStream, '00db');
+  WriteInteger(aFileStream, ImageSize);
+  BytesPerRow := ImageSize div Input.Height;
+  LineBuffer := StrAlloc(BytesPerRow);
+
+  for i := Input.Height-1 downto 1 do begin
+    k:=1;
+    LineBuffer := #0;
+    for j := 0 to Input.Width - 1 do begin
+      aColor := Input.Canvas.Pixels[i,j];
+      LineBuffer[k] := Char(GetRValue(aColor)); inc(k);  // ????
+      LineBuffer[k] := Char(GetGValue(aColor)); inc(k);
+      LineBuffer[k] := Char(GetBValue(aColor)); inc(k);
+    end;
+    WriteBufferToFile(aFileStream, LineBuffer, BytesPerRow);
+  end;
+  StrDispose(LineBuffer);
+end;
+
+
+
+{ TAVICreateParams }
+
+constructor TAVICreateParams.Create(aProjectDirectory: String;
+  aFileList: TStringList; aFrameRate: Extended; aOutputFileName,
+  aOutputDirectory: String; aStartFrameNumber: Integer;aWidth, aHeight: Integer);
+begin
+  FProjectDirectory := aProjectDirectory;
+  FFileList := TStringList.Create;
+  FFileList.Assign(aFileList);
+  FFrameRate := aFrameRate;
+  FOutputFile := aOutputFileName;
+  FOutputDirectory := aOutputDirectory;
+  FStartFrameNumber := aStartFrameNumber;
+  FWidth := aWidth;
+  FHeight := aHeight;
+end;
+
+destructor TAVICreateParams.Destroy;
+begin
+  FFileList.Free;
+end;
+
+end.

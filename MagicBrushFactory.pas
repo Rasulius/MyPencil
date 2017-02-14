@@ -1,0 +1,68 @@
+unit MagicBrushFactory;
+
+interface
+
+uses MagicBrush, Graphics;
+
+{
+Фабрика создания кистей представляет собой абстрактную фабрику
+
+}
+
+type
+  TBrushType =(tsSimple, tsGradientBrush);
+    TMagicBrushFactory = class
+  public
+    function CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType; anActiveColor: TColor; BrushWidth: Integer): TMagicBrush;
+  end;
+
+
+var
+  aFactory: TMagicBrushFactory;
+
+function CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType; anActiveColor: TColor; BrushWidth: Integer): TMagicBrush;
+
+implementation
+
+uses MagicBrushFirstComplect, SysUtils;
+
+{ TMagicBrushFactory }
+
+function TMagicBrushFactory.CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType;
+  anActiveColor: TColor; BrushWidth: Integer): TMagicBrush;
+begin
+  Result := nil;
+  // Создаем кисти через фабрику
+  case aBrushType of
+    tsSimple: begin
+      Exception.Create('Unknown brush');
+    end;
+    tsGradientBrush: begin
+       aCanvas.Pen.Mode := pmCopy;
+       Result := TGradientBrush.Create(aCanvas) ;
+       Result.Width := BrushWidth;
+       Result.ActiveColor := anActiveColor;
+    end;
+  end;
+end;
+
+function CreateBrush(aCanvas: TCanvas; aBrushType: TBrushType; anActiveColor: TColor; BrushWidth: Integer):TMagicBrush;
+begin
+   if Assigned(aFactory) then begin
+     Result := aFactory.CreateBrush(aCanvas, aBrushType, anActiveColor, BrushWidth);
+   end else begin
+    Exception.Create('Class brush not initializated');
+
+   end;
+
+end;
+
+// -------------------------При загрузке инициализируем переменную
+// При выгрузке уничтожаем
+
+initialization;
+  aFactory := TMagicBrushFactory.Create;
+finalization
+  aFactory.Free;
+  aFactory := nil;
+end.

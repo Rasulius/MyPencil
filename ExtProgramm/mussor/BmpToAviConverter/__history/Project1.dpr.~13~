@@ -1,0 +1,31 @@
+program Project1;
+
+{$APPTYPE CONSOLE}
+
+uses
+  SysUtils, Classes,
+  AviWriter in 'AviWriter.pas';
+
+
+const
+  outputFileName ='D:\Реферат\В работе\MyPencil\BmpToAviConverter\TestFolder\output.avi';
+var
+  anAviCreateParams: TAVICreateParams;
+  aFileList: TStringList;
+begin
+  try
+    aFileList:= TStringList.Create;
+    try
+      anAviCreateParams := TAVICreateParams.Create('D:\Реферат\В работе\MyPencil\BmpToAviConverter\TestFolder',aFileList,12,outputFileName);
+
+    finally
+      aFileList.Free;
+    end;
+
+
+    { TODO -oUser -cConsole Main : Insert code here }
+  except
+    on E:Exception do
+      Writeln(E.Classname, ': ', E.Message);
+  end;
+end.

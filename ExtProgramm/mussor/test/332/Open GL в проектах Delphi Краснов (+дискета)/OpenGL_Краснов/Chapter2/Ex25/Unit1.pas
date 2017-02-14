@@ -1,0 +1,94 @@
+{**********************************************************************}
+{* Иллюстрация к книге "OpenGL в проектах Delphi"                     *}
+{* Краснов М.В. softgl@chat.ru                                        *}
+{**********************************************************************}
+
+unit Unit1;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  OpenGL;
+
+type
+  TfrmGL = class(TForm)
+    procedure FormCreate(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormKeyPress(Sender: TObject; var Key: Char);
+
+  private
+    hrc: HGLRC;  
+  end;
+
+var
+  frmGL: TfrmGL;
+
+implementation
+
+{$R *.DFM}
+
+{=======================================================================
+Перерисовка окна}
+procedure TfrmGL.FormPaint(Sender: TObject);
+var
+ i : 0..60;
+begin
+ wglMakeCurrent(Canvas.Handle, hrc);
+
+ glViewPort (0, 0, ClientWidth, ClientHeight); // область вывода
+
+ glClearColor (0.75, 0.75, 0.5, 1.0); // определение цвета фона
+ glClear (GL_COLOR_BUFFER_BIT);     // очистка буфера цвета
+
+ glBegin (GL_TRIANGLE_STRIP);
+   For i := 0 to 60 do begin
+       glColor3f (random, random, random);
+       glVertex2f (0, 0);
+       glVertex2f (0.5 * cos (2 * Pi * i / 60),
+                   0.5 * sin (2 * Pi * i / 60));
+   end;
+ glEnd;
+
+ SwapBuffers(Canvas.Handle);        // содержимое буфера - на экран
+ wglMakeCurrent(0, 0);
+end;
+
+{=======================================================================
+Формат пикселя}
+procedure SetDCPixelFormat (hdc : HDC);
+var
+ pfd : TPixelFormatDescriptor;
+ nPixelFormat : Integer;
+begin
+ FillChar (pfd, SizeOf (pfd), 0);
+ pfd.dwFlags  := PFD_DRAW_TO_WINDOW or PFD_SUPPORT_OPENGL or PFD_DOUBLEBUFFER;
+ nPixelFormat := ChoosePixelFormat (hdc, @pfd);
+ SetPixelFormat (hdc, nPixelFormat, @pfd);
+end;
+
+{=======================================================================
+Создание формы}
+procedure TfrmGL.FormCreate(Sender: TObject);
+begin
+ SetDCPixelFormat(Canvas.Handle);
+ hrc := wglCreateContext(Canvas.Handle);
+end;
+
+{=======================================================================
+Конец работы приложения}
+procedure TfrmGL.FormDestroy(Sender: TObject);
+begin
+ wglDeleteContext(hrc);
+end;
+
+{=======================================================================
+Обработка нажатия клавиши}
+procedure TfrmGL.FormKeyPress(Sender: TObject; var Key: Char);
+begin
+  Refresh
+end;
+
+end.
+

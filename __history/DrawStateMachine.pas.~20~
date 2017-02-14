@@ -1,0 +1,52 @@
+unit DrawStateMachine;
+
+interface
+
+uses Graphics, Classes;
+
+type
+// Типы инструментов
+
+  // Состояние машины
+  TCurrentStatesInstrument = (csRemeberCoord, csPencil, csFill, csCircle, csKvadrat, csArc, csline, cslastic, csSelect, csSelectMoveOrRotate);
+  // Машина состоянии
+
+
+  TDrawStateMachine = class
+  private
+    FirstCall: Boolean; // Если первый вызов функции то флаг сбрасываем в false;
+    FCurrentState: TCurrentStatesInstrument;
+  public
+      constructor Create;
+
+      procedure OnMouseMove(aCanvas: TCanvas; aBuffer: TCanvas; aCurrentInstrument: TCurrentInstrument;
+        Sender: TObject; Shift: TShiftState; X, Y: Integer);
+
+
+  end;
+
+
+implementation
+
+{ TDrawStateMachine }
+
+constructor TDrawStateMachine.Create;
+begin
+  FirstCall := true;
+end;
+
+procedure TDrawStateMachine.OnMouseMove(aCanvas, aBuffer: TCanvas;
+  aCurrentInstrument: TCurrentInstrument; Sender: TObject; Shift: TShiftState;
+  X, Y: Integer);
+begin
+  if FirstCall then begin
+     // Запоминаем координаты
+     RememberCoordiant(X, Y);
+     FirstCall := False;
+  end else begin
+
+  end;
+
+end;
+
+end.

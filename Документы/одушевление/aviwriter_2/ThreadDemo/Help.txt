@@ -1,0 +1,11 @@
+Help for not so obvious things:
+
+
+1. Viewing an image:
+   Right click on the thumb.
+   Right click on the image to exit the viewer.
+
+2. You can add more than one wav-file now. One is being 
+   played after the other.
+
+Can't think of anything else.

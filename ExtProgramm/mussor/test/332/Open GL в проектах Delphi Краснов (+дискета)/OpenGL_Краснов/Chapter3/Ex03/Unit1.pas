@@ -1,0 +1,110 @@
+{**********************************************************************}
+{* Иллюстрация к книге "OpenGL в проектах Delphi"                     *}
+{* Краснов М.В. softgl@chat.ru                                        *}
+{**********************************************************************}
+
+unit Unit1;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  OpenGL;
+
+type
+  TfrmGL = class(TForm)
+    procedure FormCreate(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure FormResize(Sender: TObject);
+
+  private
+    DC : HDC;
+    hrc: HGLRC;
+    h : GLfloat;
+  end;
+
+var
+  frmGL: TfrmGL;
+
+implementation
+
+{$R *.DFM}
+
+{=======================================================================
+Перерисовка окна}
+procedure TfrmGL.FormPaint(Sender: TObject);
+begin
+ glClear (GL_COLOR_BUFFER_BIT);      // очистка буфера цвета
+
+ glBegin (GL_TRIANGLES);
+   glVertex3f (-1, -1, 0);
+   glVertex3f (-1, 1, 0);
+   glVertex3f (1, 0, h);
+ glEnd;
+
+ SwapBuffers(DC);
+end;
+
+{=======================================================================
+Формат пикселя}
+procedure SetDCPixelFormat (hdc : HDC);
+var
+ pfd : TPixelFormatDescriptor;
+ nPixelFormat : Integer;
+begin
+ FillChar (pfd, SizeOf (pfd), 0);
+ pfd.dwFlags  := PFD_DRAW_TO_WINDOW or PFD_SUPPORT_OPENGL or PFD_DOUBLEBUFFER;
+ nPixelFormat := ChoosePixelFormat (hdc, @pfd);
+ SetPixelFormat (hdc, nPixelFormat, @pfd);
+end;
+
+{=======================================================================
+Создание формы}
+procedure TfrmGL.FormCreate(Sender: TObject);
+begin
+ DC := GetDC (Handle);
+ SetDCPixelFormat(DC);
+ hrc := wglCreateContext(DC);
+ wglMakeCurrent(DC, hrc);
+ glClearColor (0.5, 0.5, 0.75, 1.0); // цвет фона
+ glColor3f (1.0, 0.0, 0.5);          // текущий цвет примитивов
+ h := 0.0;
+end;
+
+{=======================================================================
+Конец работы приложения}
+procedure TfrmGL.FormDestroy(Sender: TObject);
+begin
+ wglMakeCurrent(0, 0);
+ wglDeleteContext(hrc);
+ ReleaseDC (Handle, DC);
+ DeleteDC (DC);
+end;
+
+procedure TfrmGL.FormKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+ If Key = VK_SPACE then begin
+    If ssShift in Shift
+       then h := h + 1
+       else h := h - 1;
+    Caption := Floattostr (h);
+    Refresh
+ end;
+ If Key = VK_ESCAPE then Close;
+end;
+
+procedure TfrmGL.FormResize(Sender: TObject);
+begin
+ glViewport(0, 0, ClientWidth, ClientHeight);
+ glLoadIdentity;
+ glFrustum (-1, 1, -1, 1, 3, 10);    // задаем перспективу
+ glTranslatef(0.0, 0.0, -5.0);       // перенос объекта по оси Z
+ InvalidateRect(Handle, nil, False);
+end;
+
+end.
+

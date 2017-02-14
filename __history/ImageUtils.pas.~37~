@@ -1,0 +1,257 @@
+unit ImageUtils;
+
+interface
+
+uses Windows, Graphics, Classes;
+
+const
+  PROPRTIONAL_RESIZE = -300;
+
+// Утилитне функции для изменения размера изображения
+procedure ResizeImage(anInBitmap, anOutBitmap: TBitmap; aNewHeight, aNewWidth: Integer);
+
+// Изменить большой
+procedure ResizeBitmap(Bitmap: TBitmap; const NewWidth, NewHeight: integer);
+
+// Вывести изображение прозрачным
+procedure DrawTransparentBmp(Cnv: TCanvas; x,y: Integer; Bmp: TBitmap; clTransparent: TColor);
+
+procedure DrawTransparentBitmap(DC: HDC; hBmp : HBITMAP ;
+          xStart: integer; yStart : integer; cTransparentColor : COLORREF);
+
+procedure DrawOpacityBrush(ACanvas: TCanvas; X, Y: Integer; AColor: TColor; ASize: Integer; Opacity: Byte);
+
+function GetRedCompColor(aColor: TColor): Byte;
+function GetGreenCompColor(aColor: TColor): Byte;
+
+implementation
+
+procedure DrawOpacityBrush(ACanvas: TCanvas; X, Y: Integer; AColor: TColor; ASize: Integer; Opacity: Byte);
+var
+  Bmp: TBitmap;
+  I, J: Integer;
+  Pixels: PRGBQuad;
+  ColorRgb: Integer;
+  ColorR, ColorG, ColorB: Byte;
+begin
+  Bmp := TBitmap.Create;
+  try
+    Bmp.PixelFormat := pf32Bit; // needed for an alpha channel
+    Bmp.SetSize(ASize, ASize);
+
+    with Bmp.Canvas do
+    begin
+      Brush.Color := clFuchsia; // background color to mask out
+      ColorRgb := ColorToRGB(Brush.Color);
+      FillRect(Rect(0, 0, ASize, ASize));
+      Pen.Color := AColor;
+      Pen.Style := psSolid;
+      Pen.Width := ASize;
+      MoveTo(ASize div 2, ASize div 2);
+      LineTo(ASize div 2, ASize div 2);
+    end;
+
+    ColorR := GetRValue(ColorRgb);
+    ColorG := GetGValue(ColorRgb);
+    ColorB := GetBValue(ColorRgb);
+
+    for I := 0 to Bmp.Height-1 do
+    begin
+      Pixels := PRGBQuad(Bmp.ScanLine[I]);
+      for J := 0 to Bmp.Width-1 do
+      begin
+        with Pixels^ do
+        begin
+          if (rgbRed = ColorR) and (rgbGreen = ColorG) and (rgbBlue = ColorB) then
+            rgbReserved := 0
+          else
+            rgbReserved := Opacity;
+          // must pre-multiply the pixel with its alpha channel before drawing
+          rgbRed := (rgbRed * rgbReserved) div $FF;
+          rgbGreen := (rgbGreen * rgbReserved) div $FF;
+          rgbBlue := (rgbBlue * rgbReserved) div $FF;
+        end;
+        Inc(Pixels);
+      end;
+    end;
+
+    ACanvas.Draw(X, Y, Bmp, 255);
+  finally
+    Bmp.Free;
+  end;
+end;
+
+procedure ResizeImage(anInBitmap, anOutBitmap: TBitmap; aNewHeight, aNewWidth: Integer);
+var
+  aProprotion: Integer;
+begin
+ if aNewWidth = PROPRTIONAL_RESIZE then begin
+     aProprotion :=  anInBitmap.Height div aNewHeight;
+     aNewWidth := anInBitmap.Width div aProprotion;
+ end;
+
+  anOutBitmap.Assign(anInBitmap);
+  anOutBitmap.Canvas.StretchDraw(
+    Rect(0, 0, aNewWidth, aNewHeight),
+    anOutBitmap);
+  anOutBitmap.SetSize(aNewWidth, aNewHeight);
+end;
+
+procedure DrawTransparentBitmap(DC: HDC; hBmp : HBITMAP ;
+          xStart: integer; yStart : integer; cTransparentColor : COLORREF);
+var
+      bm:                                                  BITMAP;
+      cColor:                                              COLORREF;
+      bmAndBack, bmAndObject, bmAndMem, bmSave:            HBITMAP;
+      bmBackOld, bmObjectOld, bmMemOld, bmSaveOld:         HBITMAP;
+      hdcMem, hdcBack, hdcObject, hdcTemp, hdcSave:        HDC;
+      ptSize:                                              TPOINT;
+
+begin
+   hdcTemp := CreateCompatibleDC(dc);
+   SelectObject(hdcTemp, hBmp);   // Select the bitmap
+
+   GetObject(hBmp, sizeof(BITMAP), @bm);
+   ptSize.x := bm.bmWidth;            // Get width of bitmap
+   ptSize.y := bm.bmHeight;           // Get height of bitmap
+   DPtoLP(hdcTemp, ptSize, 1);        // Convert from device
+                                      // to logical points
+
+   // Create some DCs to hold temporary data.
+   hdcBack   := CreateCompatibleDC(dc);
+   hdcObject := CreateCompatibleDC(dc);
+   hdcMem    := CreateCompatibleDC(dc);
+   hdcSave   := CreateCompatibleDC(dc);
+
+   // Create a bitmap for each DC. DCs are required for a number of
+   // GDI functions.
+
+   // Monochrome DC
+   bmAndBack   := CreateBitmap(ptSize.x, ptSize.y, 1, 1, nil);
+
+   // Monochrome DC
+   bmAndObject := CreateBitmap(ptSize.x, ptSize.y, 1, 1, nil);
+
+   bmAndMem    := CreateCompatibleBitmap(dc, ptSize.x, ptSize.y);
+   bmSave      := CreateCompatibleBitmap(dc, ptSize.x, ptSize.y);
+
+   // Each DC must select a bitmap object to store pixel data.
+   bmBackOld   := SelectObject(hdcBack, bmAndBack);
+   bmObjectOld := SelectObject(hdcObject, bmAndObject);
+   bmMemOld    := SelectObject(hdcMem, bmAndMem);
+   bmSaveOld   := SelectObject(hdcSave, bmSave);
+
+   // Set proper mapping mode.
+   SetMapMode(hdcTemp, GetMapMode(dc));
+
+   // Save the bitmap sent here, because it will be overwritten.
+   BitBlt(hdcSave, 0, 0, ptSize.x, ptSize.y, hdcTemp, 0, 0, SRCCOPY);
+
+   // Set the background color of the source DC to the color.
+   // contained in the parts of the bitmap that should be transparent
+   cColor := SetBkColor(hdcTemp, cTransparentColor);
+
+   // Create the object mask for the bitmap by performing a BitBlt
+   // from the source bitmap to a monochrome bitmap.
+   BitBlt(hdcObject, 0, 0, ptSize.x, ptSize.y, hdcTemp, 0, 0,
+          SRCCOPY);
+
+   // Set the background color of the source DC back to the original
+   // color.
+   SetBkColor(hdcTemp, cColor);
+
+   // Create the inverse of the object mask.
+   BitBlt(hdcBack, 0, 0, ptSize.x, ptSize.y, hdcObject, 0, 0,
+          NOTSRCCOPY);
+
+   // Copy the background of the main DC to the destination.
+   BitBlt(hdcMem, 0, 0, ptSize.x, ptSize.y, dc, xStart, yStart,
+          SRCCOPY);
+
+   // Mask out the places where the bitmap will be placed.
+   BitBlt(hdcMem, 0, 0, ptSize.x, ptSize.y, hdcObject, 0, 0, SRCAND);
+
+   // Mask out the transparent colored pixels on the bitmap.
+   BitBlt(hdcTemp, 0, 0, ptSize.x, ptSize.y, hdcBack, 0, 0, SRCAND);
+
+   // XOR the bitmap with the background on the destination DC.
+   BitBlt(hdcMem, 0, 0, ptSize.x, ptSize.y, hdcTemp, 0, 0, SRCPAINT);
+
+   // Copy the destination to the screen.
+   BitBlt(dc, xStart, yStart, ptSize.x, ptSize.y, hdcMem, 0, 0,
+          SRCCOPY);
+
+   // Place the original bitmap back into the bitmap sent here.
+   BitBlt(hdcTemp, 0, 0, ptSize.x, ptSize.y, hdcSave, 0, 0, SRCCOPY);
+
+   // Delete the memory bitmaps.
+   DeleteObject(SelectObject(hdcBack, bmBackOld));
+   DeleteObject(SelectObject(hdcObject, bmObjectOld));
+   DeleteObject(SelectObject(hdcMem, bmMemOld));
+   DeleteObject(SelectObject(hdcSave, bmSaveOld));
+
+   // Delete the memory DCs.
+   DeleteDC(hdcMem);
+   DeleteDC(hdcBack);
+   DeleteDC(hdcObject);
+   DeleteDC(hdcSave);
+   DeleteDC(hdcTemp);
+end;
+
+
+
+procedure DrawTransparentBmp(Cnv: TCanvas; x,y: Integer; Bmp: TBitmap; clTransparent: TColor);
+var
+  bmpXOR, bmpAND, bmpINVAND, bmpTarget: TBitmap;
+  oldcol: Longint;
+begin
+  bmpAND := TBitmap.Create;
+  bmpTarget := TBitmap.Create;
+  bmpXOR := TBitmap.Create;
+  bmpINVAND := TBitmap.Create;
+  try
+
+    bmpAND.Width := Bmp.Width;
+    bmpAND.Height := Bmp.Height;
+    bmpAND.Monochrome := True;
+    oldcol := SetBkColor(Bmp.Canvas.Handle, ColorToRGB(clTransparent));
+    BitBlt(bmpAND.Canvas.Handle, 0, 0, Bmp.Width, Bmp.Height, Bmp.Canvas.Handle, 0, 0, SRCCOPY);
+    SetBkColor(Bmp.Canvas.Handle, oldcol);
+
+
+    bmpINVAND.Width := Bmp.Width;
+    bmpINVAND.Height := Bmp.Height;
+    bmpINVAND.Monochrome := True;
+    BitBlt(bmpINVAND.Canvas.Handle, 0, 0, Bmp.Width, Bmp.Height, bmpAND.Canvas.Handle, 0, 0, NOTSRCCOPY);
+
+
+    bmpXOR.Width := Bmp.Width;
+    bmpXOR.Height := Bmp.Height;
+    BitBlt(bmpXOR.Canvas.Handle, 0, 0, Bmp.Width, Bmp.Height, Bmp.Canvas.Handle, 0, 0, SRCCOPY);
+    BitBlt(bmpXOR.Canvas.Handle, 0, 0, Bmp.Width, Bmp.Height, bmpINVAND.Canvas.Handle, 0, 0, SRCAND);
+
+
+    bmpTarget.Width := Bmp.Width;
+    bmpTarget.Height := Bmp.Height;
+    BitBlt(bmpTarget.Canvas.Handle, 0, 0, Bmp.Width, Bmp.Height, Cnv.Handle, x, y, SRCCOPY);
+    BitBlt(bmpTarget.Canvas.Handle, 0, 0, Bmp.Width, Bmp.Height, bmpAND.Canvas.Handle, 0, 0, SRCAND);
+    BitBlt(bmpTarget.Canvas.Handle, 0, 0, Bmp.Width, Bmp.Height, bmpXOR.Canvas.Handle, 0, 0, SRCINVERT);
+    BitBlt(Cnv.Handle, x, y, Bmp.Width, Bmp.Height, bmpTarget.Canvas.Handle, 0, 0, SRCCOPY);
+  finally
+    bmpXOR.Free;
+    bmpAND.Free;
+    bmpINVAND.Free;
+    bmpTarget.Free;
+  end;
+end;
+
+
+procedure ResizeBitmap(Bitmap: TBitmap; const NewWidth, NewHeight: integer);
+begin
+  Bitmap.Canvas.StretchDraw(
+    Rect(0, 0, NewWidth, NewHeight),
+    Bitmap);
+  Bitmap.SetSize(NewWidth, NewHeight);
+end;
+
+end.
